@@ -28,3 +28,9 @@ declare module 'react-force-graph-2d' {
   const ForceGraph2D: React.ForwardRefExoticComponent<ForceGraph2DProps & React.RefAttributes<any>>;
   export default ForceGraph2D;
 }
+
+declare module 'pdfjs-dist/legacy/build/pdf.mjs' {
+  export const getDocument: any;
+  export const GlobalWorkerOptions: any;
+  export const VerbosityLevel: any;
+}

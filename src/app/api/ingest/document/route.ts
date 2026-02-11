@@ -30,14 +30,42 @@ async function extractTextFromDocx(buffer: Buffer): Promise<string> {
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   try {
-    const { PDFParse } = await import('pdf-parse');
+    // Use pdfjs-dist directly — no workers needed for text extraction
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+
+    // Disable worker to avoid serverless issues
+    if (pdfjsLib.GlobalWorkerOptions) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    }
+
     const data = new Uint8Array(buffer);
-    const parser = new PDFParse({ data, verbosity: 0 } as any);
-    const result = await parser.getText();
-    await parser.destroy();
-    const text = result.text || '';
-    console.log(`PDF parsed successfully: ${text.length} characters extracted`);
-    return text;
+    const loadingTask = pdfjsLib.getDocument({
+      data,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
+
+    const doc = await loadingTask.promise;
+    const numPages = doc.numPages;
+    const pageTexts: string[] = [];
+
+    for (let i = 1; i <= numPages; i++) {
+      const page = await doc.getPage(i);
+      const content = await page.getTextContent();
+      const text = content.items
+        .filter((item: any) => item.str !== undefined)
+        .map((item: any) => item.str)
+        .join(' ');
+      if (text.trim()) {
+        pageTexts.push(text.trim());
+      }
+    }
+
+    await doc.destroy();
+    const fullText = pageTexts.join('\n\n');
+    console.log(`PDF parsed: ${numPages} pages, ${fullText.length} chars extracted`);
+    return fullText;
   } catch (err) {
     console.error('PDF parse error:', err);
     return '';
