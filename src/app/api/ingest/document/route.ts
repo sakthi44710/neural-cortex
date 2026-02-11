@@ -29,9 +29,12 @@ async function extractTextFromDocx(buffer: Buffer): Promise<string> {
 }
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
+  console.log(`[PDF] Starting extraction, buffer size: ${buffer.length} bytes`);
   try {
     // Use pdfjs-dist directly — no workers needed for text extraction
+    console.log('[PDF] Importing pdfjs-dist...');
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    console.log('[PDF] Import successful');
 
     // Disable worker to avoid serverless issues
     if (pdfjsLib.GlobalWorkerOptions) {
@@ -39,6 +42,7 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
     }
 
     const data = new Uint8Array(buffer);
+    console.log('[PDF] Creating loading task...');
     const loadingTask = pdfjsLib.getDocument({
       data,
       useWorkerFetch: false,
@@ -46,8 +50,10 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
       useSystemFonts: true,
     });
 
+    console.log('[PDF] Loading document...');
     const doc = await loadingTask.promise;
     const numPages = doc.numPages;
+    console.log(`[PDF] Document loaded: ${numPages} pages`);
     const pageTexts: string[] = [];
 
     for (let i = 1; i <= numPages; i++) {
@@ -60,14 +66,16 @@ async function extractTextFromPdf(buffer: Buffer): Promise<string> {
       if (text.trim()) {
         pageTexts.push(text.trim());
       }
+      console.log(`[PDF] Page ${i}/${numPages}: ${text.trim().length} chars`);
     }
 
     await doc.destroy();
     const fullText = pageTexts.join('\n\n');
-    console.log(`PDF parsed: ${numPages} pages, ${fullText.length} chars extracted`);
+    console.log(`[PDF] ✅ SUCCESS: ${numPages} pages, ${fullText.length} chars extracted`);
     return fullText;
-  } catch (err) {
-    console.error('PDF parse error:', err);
+  } catch (err: any) {
+    console.error('[PDF] ❌ ERROR:', err?.message || err);
+    console.error('[PDF] Full error:', err);
     return '';
   }
 }
@@ -106,6 +114,13 @@ async function extractTextFromFile(filename: string, buffer: Buffer, mimeType: s
   }
   if (ext === 'pptx' || mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation') {
     return extractTextFromPptx(buffer);
+  }
+
+  // Image formats - use NVIDIA vision API for OCR
+  const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+  if (imageExtensions.includes(ext) || mimeType.startsWith('image/')) {
+    const { extractTextFromImage } = await import('@/lib/nvidia');
+    return extractTextFromImage(buffer, mimeType || `image/${ext}`);
   }
 
   // Plain text fallback

@@ -290,3 +290,64 @@ export function generateEmbeddingSimple(text: string): number[] {
   const norm = Math.sqrt(embedding.reduce((sum: number, val: number) => sum + val * val, 0));
   return norm > 0 ? embedding.map((v: number) => v / norm) : embedding;
 }
+
+/**
+ * Extract text from images using NVIDIA vision API (OCR)
+ */
+export async function extractTextFromImage(buffer: Buffer, mimeType: string): Promise<string> {
+  try {
+    if (!NVIDIA_API_KEY) {
+      throw new Error('NVIDIA_API_KEY is not configured');
+    }
+
+    // Convert buffer to base64
+    const base64Image = buffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64Image}`;
+
+    const response = await fetchWithTimeout(
+      NVIDIA_API_URL,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${NVIDIA_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'meta/llama-3.2-90b-vision-instruct',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Extract all visible text from this image. Return ONLY the extracted text, no explanations or descriptions. If there is no text, return "No text found".',
+                },
+                {
+                  type: 'image_url',
+                  image_url: { url: dataUrl },
+                },
+              ],
+            },
+          ],
+          max_tokens: 2048,
+          temperature: 0.2,
+        }),
+      },
+      REQUEST_TIMEOUT
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`NVIDIA API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const extractedText = data.choices?.[0]?.message?.content?.trim() || '';
+
+    console.log(`[Image OCR] Extracted ${extractedText.length} characters`);
+    return extractedText === 'No text found' ? '' : extractedText;
+  } catch (err: any) {
+    console.error('[Image OCR] Error:', err?.message || err);
+    return '';
+  }
+}
