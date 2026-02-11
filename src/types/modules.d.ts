@@ -29,8 +29,8 @@ declare module 'react-force-graph-2d' {
   export default ForceGraph2D;
 }
 
-declare module 'pdfjs-dist/legacy/build/pdf.mjs' {
-  export const getDocument: any;
-  export const GlobalWorkerOptions: any;
-  export const VerbosityLevel: any;
+declare module 'unpdf' {
+  export function extractText(data: Uint8Array, options?: { mergePages?: boolean }): Promise<{ text: string; totalPages: number }>;
+  export function getDocumentProxy(data: Uint8Array): Promise<any>;
+  export function getMeta(data: Uint8Array): Promise<any>;
 }

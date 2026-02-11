@@ -31,51 +31,14 @@ async function extractTextFromDocx(buffer: Buffer): Promise<string> {
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   console.log(`[PDF] Starting extraction, buffer size: ${buffer.length} bytes`);
   try {
-    // Use pdfjs-dist directly — no workers needed for text extraction
-    console.log('[PDF] Importing pdfjs-dist...');
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    console.log('[PDF] Import successful');
-
-    // Disable worker to avoid serverless issues
-    if (pdfjsLib.GlobalWorkerOptions) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-    }
-
+    // Use unpdf — serverless-native PDF parser (works on Vercel, Edge, Node)
+    const { extractText } = await import('unpdf');
     const data = new Uint8Array(buffer);
-    console.log('[PDF] Creating loading task...');
-    const loadingTask = pdfjsLib.getDocument({
-      data,
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      useSystemFonts: true,
-    });
-
-    console.log('[PDF] Loading document...');
-    const doc = await loadingTask.promise;
-    const numPages = doc.numPages;
-    console.log(`[PDF] Document loaded: ${numPages} pages`);
-    const pageTexts: string[] = [];
-
-    for (let i = 1; i <= numPages; i++) {
-      const page = await doc.getPage(i);
-      const content = await page.getTextContent();
-      const text = content.items
-        .filter((item: any) => item.str !== undefined)
-        .map((item: any) => item.str)
-        .join(' ');
-      if (text.trim()) {
-        pageTexts.push(text.trim());
-      }
-      console.log(`[PDF] Page ${i}/${numPages}: ${text.trim().length} chars`);
-    }
-
-    await doc.destroy();
-    const fullText = pageTexts.join('\n\n');
-    console.log(`[PDF] ✅ SUCCESS: ${numPages} pages, ${fullText.length} chars extracted`);
-    return fullText;
+    const { text, totalPages } = await extractText(data, { mergePages: true });
+    console.log(`[PDF] ✅ SUCCESS: ${totalPages} pages, ${text.length} chars extracted`);
+    return text || '';
   } catch (err: any) {
     console.error('[PDF] ❌ ERROR:', err?.message || err);
-    console.error('[PDF] Full error:', err);
     return '';
   }
 }

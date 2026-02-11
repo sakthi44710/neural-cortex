@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDropzone } from 'react-dropzone';
 import {
-  Upload, FileText, Trash2, Clock, Search, X, Eye, Brain, Loader2,
+  Upload, FileText, Trash2, Clock, Search, X, Eye, Brain, Loader2, ImageIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatRelativeDate } from '@/lib/utils';
@@ -76,6 +76,11 @@ export default function VaultPage() {
     }
   }, []);
 
+  const isImageFile = (type: string | null) => {
+    if (!type) return false;
+    return type.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(type);
+  };
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
@@ -86,6 +91,10 @@ export default function VaultPage() {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/gif': ['.gif'],
+      'image/webp': ['.webp'],
     },
   });
 
@@ -155,17 +164,15 @@ export default function VaultPage() {
       {/* Upload Zone */}
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 ${
-          isDragActive
+        className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 ${isDragActive
             ? 'border-neon-blue bg-neon-blue/5'
             : 'border-border-custom hover:border-neon-blue/50 hover:bg-white/[0.02]'
-        }`}
+          }`}
       >
         <input {...getInputProps()} />
         <Upload
-          className={`w-12 h-12 mx-auto mb-4 transition-colors ${
-            isDragActive ? 'text-neon-blue' : 'text-text-secondary'
-          }`}
+          className={`w-12 h-12 mx-auto mb-4 transition-colors ${isDragActive ? 'text-neon-blue' : 'text-text-secondary'
+            }`}
         />
         {uploading ? (
           <div className="flex items-center justify-center gap-2">
@@ -177,7 +184,7 @@ export default function VaultPage() {
         ) : (
           <>
             <p className="text-lg font-medium mb-1">Drop files here or click to upload</p>
-            <p className="text-text-secondary text-sm">Supports DOCX, PDF, PPTX, TXT, MD, JSON, CSV files</p>
+            <p className="text-text-secondary text-sm">Supports DOCX, PDF, PPTX, TXT, MD, JSON, CSV, PNG, JPG, GIF, WEBP files</p>
           </>
         )}
       </div>
@@ -196,8 +203,14 @@ export default function VaultPage() {
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-neon-blue/20 to-neon-purple/20 flex items-center justify-center shrink-0">
-                    <FileText className="w-5 h-5 text-neon-blue" />
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${isImageFile(doc.fileType) ? 'from-neon-green/20 to-neon-blue/20' : 'from-neon-blue/20 to-neon-purple/20'} flex items-center justify-center shrink-0 overflow-hidden`}>
+                    {isImageFile(doc.fileType) && doc.fileUrl ? (
+                      <img src={doc.fileUrl} alt={doc.title} className="w-full h-full object-cover rounded-xl" />
+                    ) : isImageFile(doc.fileType) ? (
+                      <ImageIcon className="w-5 h-5 text-neon-green" />
+                    ) : (
+                      <FileText className="w-5 h-5 text-neon-blue" />
+                    )}
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-semibold text-sm truncate">{doc.title}</h3>
@@ -223,9 +236,8 @@ export default function VaultPage() {
                       title="Process with AI"
                     >
                       <Brain
-                        className={`w-4 h-4 ${
-                          processing === doc.id ? 'text-neon-blue animate-pulse' : 'text-text-secondary'
-                        }`}
+                        className={`w-4 h-4 ${processing === doc.id ? 'text-neon-blue animate-pulse' : 'text-text-secondary'
+                          }`}
                       />
                     </button>
                   )}
@@ -336,6 +348,16 @@ export default function VaultPage() {
                         </span>
                       ))}
                     </div>
+                  </div>
+                )}
+                {isImageFile(selectedDoc.fileType) && selectedDoc.fileUrl && (
+                  <div className="mb-4">
+                    <h3 className="text-sm font-semibold mb-2">Image Preview</h3>
+                    <img
+                      src={selectedDoc.fileUrl}
+                      alt={selectedDoc.title}
+                      className="max-w-full rounded-xl border border-border-custom"
+                    />
                   </div>
                 )}
                 <div>
