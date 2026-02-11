@@ -2,9 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Bot, User, Sparkles, Loader2, Plus, MessageSquare, Trash2, Paperclip, FileText, X, Upload, Check } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { Send, Bot, User, Sparkles, Loader2, Plus, MessageSquare, Trash2, Paperclip, FileText, X, Upload, Check, Copy, RotateCcw } from 'lucide-react';
+import ChatMarkdown from '@/components/shared/ChatMarkdown';
 import toast from 'react-hot-toast';
 
 interface Message {
@@ -368,7 +367,7 @@ export default function ConversePage() {
           )}
 
           <AnimatePresence>
-            {messages.map((msg) => (
+            {messages.map((msg, idx) => (
               <motion.div
                 key={msg.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -381,28 +380,52 @@ export default function ConversePage() {
                   </div>
                 )}
                 <div
-                  className={`max-w-[75%] ${
+                  className={`group/msg relative ${
                     msg.role === 'user'
-                      ? 'bg-gradient-to-r from-neon-blue/20 to-neon-purple/20 border border-neon-blue/20 rounded-2xl rounded-br-md px-4 py-3'
-                      : 'bg-white/5 rounded-2xl rounded-bl-md px-4 py-3'
+                      ? 'max-w-[75%] bg-gradient-to-r from-neon-blue/20 to-neon-purple/20 border border-neon-blue/20 rounded-2xl rounded-br-md px-4 py-3'
+                      : 'max-w-[85%] bg-white/[0.03] rounded-2xl rounded-bl-md px-4 py-3'
                   }`}
                 >
                   {msg.role === 'assistant' ? (
-                    <div className="prose prose-invert prose-sm max-w-none">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                    </div>
+                    <>
+                      {msg.content ? (
+                        <ChatMarkdown content={msg.content} />
+                      ) : (
+                        <div className="flex items-center gap-2 py-1">
+                          <Loader2 className="w-4 h-4 animate-spin text-neon-blue" />
+                          <span className="text-sm text-text-secondary">Thinking...</span>
+                        </div>
+                      )}
+                      {/* Action buttons — visible on hover */}
+                      {msg.content && (
+                        <div className="flex items-center gap-1 mt-2 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                          <button
+                            onClick={async () => {
+                              await navigator.clipboard.writeText(msg.content);
+                              toast.success('Copied to clipboard');
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-text-secondary hover:text-white hover:bg-white/10 transition-all"
+                            title="Copy response"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy</span>
+                          </button>
+                        </div>
+                      )}
+                    </>
                   ) : (
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                   )}
                   {msg.sources && msg.sources.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-white/10">
-                      <p className="text-xs text-text-secondary mb-1">Sources:</p>
-                      <div className="flex flex-wrap gap-1">
+                    <div className="mt-3 pt-2.5 border-t border-white/10">
+                      <p className="text-[11px] text-text-secondary mb-1.5 font-medium uppercase tracking-wider">Sources</p>
+                      <div className="flex flex-wrap gap-1.5">
                         {msg.sources.map((source, i) => (
                           <span
                             key={i}
-                            className="px-2 py-0.5 rounded text-xs bg-neon-blue/10 text-neon-blue"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-neon-blue/10 text-neon-blue border border-neon-blue/15"
                           >
+                            <FileText className="w-3 h-3" />
                             {source.title}
                           </span>
                         ))}
@@ -419,17 +442,6 @@ export default function ConversePage() {
             ))}
           </AnimatePresence>
 
-          {isLoading && messages.length > 0 && messages[messages.length - 1]?.content === '' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-blue to-neon-purple flex items-center justify-center shrink-0">
-                <Bot className="w-4 h-4 text-white" />
-              </div>
-              <div className="bg-white/5 rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-neon-blue" />
-                <span className="text-sm text-text-secondary">Connecting to AI...</span>
-              </div>
-            </motion.div>
-          )}
           <div ref={messagesEndRef} />
         </div>
 

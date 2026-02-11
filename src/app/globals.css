@@ -188,3 +188,326 @@
 .prose-invert ol li::marker {
   color: #b829f7;
 }
+
+/* ═══════════════════════════════════════════════════
+   ChatMarkdown — ChatGPT-quality rendering styles
+   ═══════════════════════════════════════════════════ */
+
+/* ── Paragraph ── */
+.chat-markdown .chat-p {
+  margin: 0.5em 0;
+  line-height: 1.75;
+  color: #d0d0dd;
+  font-size: 0.9rem;
+}
+
+.chat-markdown .chat-p:first-child {
+  margin-top: 0;
+}
+
+.chat-markdown .chat-p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Inline code ── */
+.chat-markdown .chat-inline-code {
+  color: #00f0ff;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.15);
+  padding: 0.15em 0.4em;
+  border-radius: 0.3rem;
+  font-size: 0.85em;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ── Code block container ── */
+.chat-markdown .chat-code-block {
+  margin: 1em 0;
+  border-radius: 0.75rem;
+  border: 1px solid #2a2a3a;
+  overflow: hidden;
+  background: #0d0d14;
+}
+
+.chat-markdown .chat-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid #2a2a3a;
+}
+
+.chat-markdown .chat-code-lang {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #888;
+  text-transform: lowercase;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.chat-markdown .chat-code-body {
+  overflow-x: auto;
+}
+
+.chat-markdown .chat-code-body pre {
+  margin: 0 !important;
+  padding: 1rem !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+.chat-markdown .chat-code-body pre code {
+  background: transparent !important;
+  padding: 0 !important;
+  color: #e0e0ee;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  tab-size: 2;
+  white-space: pre;
+}
+
+/* ── Syntax color hints (keyword patterns via text) ── */
+.chat-markdown .chat-code-body pre code .keyword {
+  color: #c678dd;
+}
+
+/* ── Table wrapper ── */
+.chat-markdown .chat-table-wrapper {
+  margin: 1em 0;
+  overflow-x: auto;
+  border-radius: 0.75rem;
+  border: 1px solid #2a2a3a;
+}
+
+.chat-markdown .chat-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.chat-markdown .chat-thead {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.chat-markdown .chat-th {
+  padding: 0.7rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 2px solid #2a2a3a;
+  white-space: nowrap;
+}
+
+.chat-markdown .chat-td {
+  padding: 0.6rem 1rem;
+  color: #c0c0d0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+.chat-markdown .chat-tr:last-child .chat-td {
+  border-bottom: none;
+}
+
+.chat-markdown .chat-tr:hover .chat-td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Alternating row colors */
+.chat-markdown .chat-tbody .chat-tr:nth-child(even) .chat-td {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.chat-markdown .chat-tbody .chat-tr:nth-child(even):hover .chat-td {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+/* ── Headings ── */
+.chat-markdown .chat-h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 1.2em 0 0.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chat-markdown .chat-h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 1em 0 0.4em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.chat-markdown .chat-h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #eeeef5;
+  margin: 0.8em 0 0.3em;
+}
+
+.chat-markdown .chat-h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #dddde5;
+  margin: 0.6em 0 0.2em;
+}
+
+.chat-markdown .chat-h1:first-child,
+.chat-markdown .chat-h2:first-child,
+.chat-markdown .chat-h3:first-child,
+.chat-markdown .chat-h4:first-child {
+  margin-top: 0;
+}
+
+/* ── Blockquote ── */
+.chat-markdown .chat-blockquote {
+  margin: 0.8em 0;
+  padding: 0.6rem 1rem;
+  border-left: 3px solid #b829f7;
+  background: rgba(184, 41, 247, 0.06);
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: #b0b0c0;
+  font-style: italic;
+}
+
+.chat-markdown .chat-blockquote .chat-p {
+  margin: 0.25em 0;
+}
+
+/* ── Lists ── */
+.chat-markdown .chat-ul {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+  list-style-type: disc;
+}
+
+.chat-markdown .chat-ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+  list-style-type: decimal;
+}
+
+.chat-markdown .chat-li {
+  margin: 0.25em 0;
+  line-height: 1.65;
+  color: #c0c0d0;
+}
+
+.chat-markdown .chat-li::marker {
+  color: #b829f7;
+}
+
+.chat-markdown .chat-ol > .chat-li::marker {
+  color: #00f0ff;
+  font-weight: 600;
+}
+
+/* Nested lists */
+.chat-markdown .chat-ul .chat-ul,
+.chat-markdown .chat-ol .chat-ol,
+.chat-markdown .chat-ul .chat-ol,
+.chat-markdown .chat-ol .chat-ul {
+  margin: 0.2em 0;
+}
+
+/* ── Links ── */
+.chat-markdown .chat-link {
+  color: #00f0ff;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.3);
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.chat-markdown .chat-link:hover {
+  color: #40f8ff;
+  border-bottom-color: #00f0ff;
+}
+
+/* ── Horizontal rule ── */
+.chat-markdown .chat-hr {
+  margin: 1.5em 0;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── Strong / Em ── */
+.chat-markdown .chat-strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.chat-markdown .chat-em {
+  color: #c0c0dd;
+  font-style: italic;
+}
+
+/* ── Strikethrough (GFM) ── */
+.chat-markdown del {
+  color: #888;
+  text-decoration: line-through;
+}
+
+/* ── Task list checkboxes (GFM) ── */
+.chat-markdown input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #555;
+  border-radius: 0.25rem;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  position: relative;
+  cursor: default;
+}
+
+.chat-markdown input[type="checkbox"]:checked {
+  background: #00f0ff;
+  border-color: #00f0ff;
+}
+
+.chat-markdown input[type="checkbox"]:checked::after {
+  content: '✓';
+  color: #0a0a0f;
+  font-size: 0.7rem;
+  font-weight: bold;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* ── Scrollbar inside code blocks ── */
+.chat-markdown .chat-code-body::-webkit-scrollbar,
+.chat-markdown .chat-table-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.chat-markdown .chat-code-body::-webkit-scrollbar-track,
+.chat-markdown .chat-table-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-markdown .chat-code-body::-webkit-scrollbar-thumb,
+.chat-markdown .chat-table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.chat-markdown .chat-code-body::-webkit-scrollbar-thumb:hover,
+.chat-markdown .chat-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
