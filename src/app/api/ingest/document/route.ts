@@ -303,9 +303,44 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  // Re-process with AI
-  if (doc.content && doc.content.length > 20 && !doc.content.startsWith('[File:')) {
-    processDocumentWithAI(docId, doc.content, session.user.id).catch(console.error);
+  let content = doc.content;
+
+  // If content is just file metadata (extraction previously failed),
+  // re-download from Blob and re-extract text
+  if (content.startsWith('[File:') && doc.fileUrl) {
+    console.log(`[REPROCESS] Re-downloading ${doc.title} from Blob for re-extraction...`);
+    try {
+      const response = await fetch(doc.fileUrl);
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const filename = doc.title || 'unknown';
+        const mimeType = doc.fileType || '';
+
+        content = await extractTextFromFile(filename, buffer, mimeType);
+        content = content.replace(/\x00/g, '').trim();
+
+        if (content && content.length > 10) {
+          // Update the stored content with the properly extracted text
+          await prisma.document.update({
+            where: { id: docId },
+            data: { content: content.slice(0, 50000) },
+          });
+          console.log(`[REPROCESS] ✅ Re-extracted ${content.length} chars from ${doc.title}`);
+        } else {
+          console.log(`[REPROCESS] ❌ Re-extraction still yielded no text for ${doc.title}`);
+          return NextResponse.json({ error: 'Could not extract text from file' }, { status: 422 });
+        }
+      }
+    } catch (err: any) {
+      console.error(`[REPROCESS] Error re-extracting ${doc.title}:`, err?.message);
+      return NextResponse.json({ error: 'Failed to re-extract text' }, { status: 500 });
+    }
+  }
+
+  // Process with AI
+  if (content && content.length > 20 && !content.startsWith('[File:')) {
+    processDocumentWithAI(docId, content, session.user.id).catch(console.error);
   }
 
   return NextResponse.json({ success: true });
