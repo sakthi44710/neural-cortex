@@ -3,17 +3,166 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --bg-primary: #0a0a0f;
-    --bg-secondary: #12121a;
-    --bg-tertiary: #1a1a25;
-    --neon-blue: #00f0ff;
-    --neon-purple: #b829f7;
-    --neon-pink: #ff0080;
-    --neon-green: #00ff88;
+
+  /* ══════════════════════════════════════════════════════════════════════════════
+     THEME 1: PROFESSIONAL DARK (DEFAULT)
+     Sleek obsidian/slate layered surfaces with refined Slate Blue (#3b82f6) accent
+     ══════════════════════════════════════════════════════════════════════════════ */
+  :root,
+  [data-theme="dark"] {
+    --bg-primary: #090d16;
+    --bg-secondary: #0f172a;
+    --bg-tertiary: #1e293b;
+    --surface: rgba(15, 23, 42, 0.85);
+    --surface-elevated: #1e293b;
+    --surface-overlay: rgba(15, 23, 42, 0.95);
+    --border-subtle: rgba(148, 163, 184, 0.08);
+    --border-custom: rgba(148, 163, 184, 0.16);
+    --border-muted: rgba(148, 163, 184, 0.28);
+    --border: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --accent-subtle: rgba(59, 130, 246, 0.12);
+    --accent-purple: #8b5cf6;
+    --accent-green: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-pink: #ec4899;
+    --card-bg: rgba(15, 23, 42, 0.7);
+    --card-border: rgba(148, 163, 184, 0.12);
+    --scrollbar-bg: #090d16;
+    --scrollbar-thumb: #1e293b;
+    --scrollbar-thumb-hover: #334155;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════════
+     THEME 2: PROFESSIONAL LIGHT
+     Enterprise clean, neutral white/slate surfaces, crisp borders, dark text
+     ══════════════════════════════════════════════════════════════════════════════ */
+  [data-theme="light"] {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f1f5f9;
+    --surface: #ffffff;
+    --surface-elevated: #f8fafc;
+    --surface-overlay: rgba(255, 255, 255, 0.98);
+    --border-subtle: rgba(226, 232, 240, 0.8);
+    --border-custom: #e2e8f0;
+    --border-muted: #cbd5e1;
+    --border: #e2e8f0;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-subtle: rgba(37, 99, 235, 0.08);
+    --accent-purple: #7c3aed;
+    --accent-green: #059669;
+    --accent-amber: #d97706;
+    --accent-pink: #db2777;
+    --card-bg: #ffffff;
+    --card-border: #e2e8f0;
+    --scrollbar-bg: #f8fafc;
+    --scrollbar-thumb: #cbd5e1;
+    --scrollbar-thumb-hover: #94a3b8;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════════
+     THEME 3: MIDNIGHT
+     Deep navy/black atmosphere, cobalt accents, calm technical depth
+     ══════════════════════════════════════════════════════════════════════════════ */
+  [data-theme="midnight"] {
+    --bg-primary: #050814;
+    --bg-secondary: #0b1126;
+    --bg-tertiary: #131c38;
+    --surface: rgba(11, 17, 38, 0.85);
+    --surface-elevated: #131c38;
+    --surface-overlay: rgba(11, 17, 38, 0.96);
+    --border-subtle: rgba(99, 130, 185, 0.1);
+    --border-custom: rgba(99, 130, 185, 0.2);
+    --border-muted: rgba(99, 130, 185, 0.32);
+    --border: #131c38;
+    --text-primary: #f0f4ff;
+    --text-secondary: #8da4d0;
+    --text-muted: #5d75a4;
+    --accent: #38bdf8;
+    --accent-hover: #0ea5e9;
+    --accent-subtle: rgba(56, 189, 248, 0.12);
+    --accent-purple: #818cf8;
+    --accent-green: #34d399;
+    --accent-amber: #fbbf24;
+    --accent-pink: #f472b6;
+    --card-bg: rgba(11, 17, 38, 0.7);
+    --card-border: rgba(99, 130, 185, 0.16);
+    --scrollbar-bg: #050814;
+    --scrollbar-thumb: #131c38;
+    --scrollbar-thumb-hover: #24335c;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════════
+     THEME 4: GRAPHITE
+     Dark neutral monochromatic charcoal/zinc, low saturation, technical purity
+     ══════════════════════════════════════════════════════════════════════════════ */
+  [data-theme="graphite"] {
+    --bg-primary: #121214;
+    --bg-secondary: #18181b;
+    --bg-tertiary: #27272a;
+    --surface: rgba(24, 24, 27, 0.85);
+    --surface-elevated: #27272a;
+    --surface-overlay: rgba(24, 24, 27, 0.96);
+    --border-subtle: rgba(161, 161, 170, 0.1);
+    --border-custom: rgba(161, 161, 170, 0.18);
+    --border-muted: rgba(161, 161, 170, 0.3);
+    --border: #27272a;
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+    --accent: #60a5fa;
+    --accent-hover: #3b82f6;
+    --accent-subtle: rgba(96, 165, 250, 0.12);
+    --accent-purple: #a78bfa;
+    --accent-green: #34d399;
+    --accent-amber: #fbbf24;
+    --accent-pink: #f472b6;
+    --card-bg: rgba(24, 24, 27, 0.75);
+    --card-border: rgba(161, 161, 170, 0.14);
+    --scrollbar-bg: #121214;
+    --scrollbar-thumb: #27272a;
+    --scrollbar-thumb-hover: #3f3f46;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════════
+     THEME 5: HIGH CONTRAST
+     Maximum readability, pure black/white contrasts, thick borders, sharp outlines
+     ══════════════════════════════════════════════════════════════════════════════ */
+  [data-theme="high-contrast"] {
+    --bg-primary: #000000;
+    --bg-secondary: #0a0a0a;
+    --bg-tertiary: #171717;
+    --surface: #0a0a0a;
+    --surface-elevated: #171717;
+    --surface-overlay: #000000;
+    --border-subtle: #404040;
+    --border-custom: #737373;
+    --border-muted: #ffffff;
+    --border: #737373;
     --text-primary: #ffffff;
-    --text-secondary: #a0a0b0;
-    --border: #2a2a3a;
+    --text-secondary: #e5e5e5;
+    --text-muted: #a3a3a3;
+    --accent: #38bdf8;
+    --accent-hover: #7dd3fc;
+    --accent-subtle: rgba(56, 189, 248, 0.25);
+    --accent-purple: #c084fc;
+    --accent-green: #4ade80;
+    --accent-amber: #facc15;
+    --accent-pink: #f472b6;
+    --card-bg: #0a0a0a;
+    --card-border: #737373;
+    --scrollbar-bg: #000000;
+    --scrollbar-thumb: #525252;
+    --scrollbar-thumb-hover: #ffffff;
   }
 
   * {
@@ -29,6 +178,7 @@
   body {
     background: var(--bg-primary);
     color: var(--text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   ::-webkit-scrollbar {
@@ -37,168 +187,102 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--bg-primary);
+    background: var(--scrollbar-bg);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--border);
+    background: var(--scrollbar-thumb);
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #3a3a4a;
+    background: var(--scrollbar-thumb-hover);
   }
 }
 
 @layer components {
+
+  /* Modern clean technical card surfaces */
   .glass {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--card-bg);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--card-border);
   }
 
   .glass-strong {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--surface-overlay);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-custom);
   }
 
+  /* Professional text gradient (neutral to soft slate) */
   .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-neon-blue via-neon-purple to-neon-pink;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-text-primary via-text-secondary to-text-muted;
   }
 
-  .neon-glow {
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.12),
-                0 0 30px rgba(0, 240, 255, 0.04);
-  }
-
+  /* Replaced neon glow with subtle technical elevation shadow */
+  .neon-glow,
   .neon-glow-purple {
-    box-shadow: 0 0 15px rgba(184, 41, 247, 0.12),
-                0 0 30px rgba(184, 41, 247, 0.04);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-custom);
   }
 
   .card-hover {
-    @apply transition-all duration-300 ease-out;
+    @apply transition-all duration-200 ease-out;
   }
 
   .card-hover:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.3);
+    border-color: var(--border-muted);
   }
 
+  /* Calm, restrained ambient background */
   .neural-bg {
     background-image:
-      radial-gradient(circle at 20% 80%, rgba(0, 240, 255, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, rgba(184, 41, 247, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 50% 50%, rgba(255, 0, 128, 0.02) 0%, transparent 50%);
+      radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.03) 0%, transparent 40%),
+      radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.02) 0%, transparent 40%);
   }
 
+  /* Solid slate blue primary button */
   .btn-primary {
-    @apply px-6 py-3 rounded-xl font-semibold text-white transition-all duration-200;
-    background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+    @apply px-4 py-2.5 rounded-xl font-medium text-white transition-all duration-150 inline-flex items-center justify-center gap-2;
+    background: var(--accent);
   }
 
   .btn-primary:hover {
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+    background: var(--accent-hover);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
     transform: translateY(-1px);
   }
 
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
   .btn-secondary {
-    @apply px-6 py-3 rounded-xl font-semibold text-white transition-all duration-200 glass;
+    @apply px-4 py-2.5 rounded-xl font-medium text-text-primary transition-all duration-150 glass inline-flex items-center justify-center gap-2;
   }
 
   .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--bg-tertiary);
+    border-color: var(--border-muted);
   }
 
   .input-dark {
-    @apply w-full px-4 py-3 rounded-xl bg-bg-secondary border border-border-custom text-white placeholder-text-secondary focus:outline-none focus:border-neon-blue/50 transition-colors;
+    @apply w-full px-4 py-2.5 rounded-xl bg-bg-secondary border border-border-custom text-text-primary placeholder-text-muted focus:outline-none focus:border-blue-500 transition-colors;
   }
 }
 
-@keyframes particle-float {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
-  25% { transform: translate(10px, -20px) scale(1.1); opacity: 0.7; }
-  50% { transform: translate(-5px, -40px) scale(0.9); opacity: 0.5; }
-  75% { transform: translate(15px, -20px) scale(1.05); opacity: 0.6; }
-}
-
-.particle {
-  animation: particle-float 8s ease-in-out infinite;
-}
-
-.animated-gradient {
-  background: linear-gradient(-45deg, #0a0a0f, #1a0a2a, #0a1a2a, #0a0a1f);
-  background-size: 400% 400%;
-  animation: gradient-x 15s ease infinite;
-}
-
-@keyframes gradient-x {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-/* Prose overrides for dark theme markdown */
-.prose-invert {
-  color: #a0a0b0;
-}
-
-.prose-invert h1,
-.prose-invert h2,
-.prose-invert h3,
-.prose-invert h4 {
-  color: #ffffff;
-}
-
-.prose-invert strong {
-  color: #ffffff;
-}
-
-.prose-invert code {
-  color: #00f0ff;
-  background: rgba(0, 240, 255, 0.1);
-  padding: 0.1em 0.3em;
-  border-radius: 0.25rem;
-  font-size: 0.85em;
-}
-
-.prose-invert pre {
-  background: #12121a;
-  border: 1px solid #2a2a3a;
-  border-radius: 0.75rem;
-  padding: 1rem;
-  overflow-x: auto;
-}
-
-.prose-invert pre code {
-  background: transparent;
-  padding: 0;
-}
-
-.prose-invert a {
-  color: #00f0ff;
-}
-
-.prose-invert blockquote {
-  border-left-color: #b829f7;
-  color: #a0a0b0;
-}
-
-.prose-invert ul li::marker,
-.prose-invert ol li::marker {
-  color: #b829f7;
-}
-
 /* ═══════════════════════════════════════════════════
-   ChatMarkdown — ChatGPT-quality rendering styles
+   ChatMarkdown — Professional Technical Rendering
    ═══════════════════════════════════════════════════ */
 
-/* ── Paragraph ── */
 .chat-markdown .chat-p {
   margin: 0.5em 0;
   line-height: 1.75;
-  color: #d0d0dd;
-  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-size: 0.92rem;
 }
 
 .chat-markdown .chat-p:first-child {
@@ -209,26 +293,26 @@
   margin-bottom: 0;
 }
 
-/* ── Inline code ── */
+/* Technical Inline code */
 .chat-markdown .chat-inline-code {
-  color: #00f0ff;
-  background: rgba(0, 240, 255, 0.1);
-  border: 1px solid rgba(0, 240, 255, 0.15);
+  color: var(--accent);
+  background: var(--accent-subtle);
+  border: 1px solid var(--border-subtle);
   padding: 0.15em 0.4em;
-  border-radius: 0.3rem;
+  border-radius: 0.35rem;
   font-size: 0.85em;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-weight: 500;
   white-space: nowrap;
 }
 
-/* ── Code block container ── */
+/* Code block container */
 .chat-markdown .chat-code-block {
   margin: 1em 0;
   border-radius: 0.75rem;
-  border: 1px solid #2a2a3a;
+  border: 1px solid var(--border-custom);
   overflow: hidden;
-  background: #0d0d14;
+  background: var(--bg-secondary);
 }
 
 .chat-markdown .chat-code-header {
@@ -236,14 +320,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 1rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid #2a2a3a;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .chat-markdown .chat-code-lang {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #888;
+  color: var(--text-muted);
   text-transform: lowercase;
   font-family: 'Inter', sans-serif;
   letter-spacing: 0.02em;
@@ -264,53 +348,48 @@
 .chat-markdown .chat-code-body pre code {
   background: transparent !important;
   padding: 0 !important;
-  color: #e0e0ee;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
-  font-size: 0.82rem;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.84rem;
   line-height: 1.7;
   tab-size: 2;
   white-space: pre;
 }
 
-/* ── Syntax color hints (keyword patterns via text) ── */
-.chat-markdown .chat-code-body pre code .keyword {
-  color: #c678dd;
-}
-
-/* ── Table wrapper ── */
+/* Table wrapper */
 .chat-markdown .chat-table-wrapper {
   margin: 1em 0;
   overflow-x: auto;
   border-radius: 0.75rem;
-  border: 1px solid #2a2a3a;
+  border: 1px solid var(--border-custom);
 }
 
 .chat-markdown .chat-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
 }
 
 .chat-markdown .chat-thead {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-tertiary);
 }
 
 .chat-markdown .chat-th {
-  padding: 0.7rem 1rem;
+  padding: 0.75rem 1rem;
   text-align: left;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border-bottom: 2px solid #2a2a3a;
+  border-bottom: 2px solid var(--border-custom);
   white-space: nowrap;
 }
 
 .chat-markdown .chat-td {
-  padding: 0.6rem 1rem;
-  color: #c0c0d0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0.65rem 1rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
   vertical-align: top;
   line-height: 1.5;
 }
@@ -320,48 +399,39 @@
 }
 
 .chat-markdown .chat-tr:hover .chat-td {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--border-subtle);
 }
 
-/* Alternating row colors */
-.chat-markdown .chat-tbody .chat-tr:nth-child(even) .chat-td {
-  background: rgba(255, 255, 255, 0.015);
-}
-
-.chat-markdown .chat-tbody .chat-tr:nth-child(even):hover .chat-td {
-  background: rgba(255, 255, 255, 0.035);
-}
-
-/* ── Headings ── */
+/* Headings */
 .chat-markdown .chat-h1 {
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-primary);
   margin: 1.2em 0 0.5em;
   padding-bottom: 0.3em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .chat-markdown .chat-h2 {
   font-size: 1.15rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-primary);
   margin: 1em 0 0.4em;
   padding-bottom: 0.2em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .chat-markdown .chat-h3 {
   font-size: 1rem;
   font-weight: 600;
-  color: #eeeef5;
+  color: var(--text-primary);
   margin: 0.8em 0 0.3em;
 }
 
 .chat-markdown .chat-h4 {
   font-size: 0.9rem;
   font-weight: 600;
-  color: #dddde5;
+  color: var(--text-secondary);
   margin: 0.6em 0 0.2em;
 }
 
@@ -372,14 +442,14 @@
   margin-top: 0;
 }
 
-/* ── Blockquote ── */
+/* Blockquote */
 .chat-markdown .chat-blockquote {
   margin: 0.8em 0;
   padding: 0.6rem 1rem;
-  border-left: 3px solid #b829f7;
-  background: rgba(184, 41, 247, 0.06);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-subtle);
   border-radius: 0 0.5rem 0.5rem 0;
-  color: #b0b0c0;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -387,7 +457,7 @@
   margin: 0.25em 0;
 }
 
-/* ── Lists ── */
+/* Lists */
 .chat-markdown .chat-ul {
   margin: 0.5em 0;
   padding-left: 1.5em;
@@ -403,111 +473,68 @@
 .chat-markdown .chat-li {
   margin: 0.25em 0;
   line-height: 1.65;
-  color: #c0c0d0;
+  color: var(--text-secondary);
 }
 
 .chat-markdown .chat-li::marker {
-  color: #b829f7;
+  color: var(--accent);
 }
 
-.chat-markdown .chat-ol > .chat-li::marker {
-  color: #00f0ff;
+.chat-markdown .chat-ol>.chat-li::marker {
+  color: var(--accent);
   font-weight: 600;
 }
 
-/* Nested lists */
-.chat-markdown .chat-ul .chat-ul,
-.chat-markdown .chat-ol .chat-ol,
-.chat-markdown .chat-ul .chat-ol,
-.chat-markdown .chat-ol .chat-ul {
-  margin: 0.2em 0;
-}
-
-/* ── Links ── */
+/* Links */
 .chat-markdown .chat-link {
-  color: #00f0ff;
+  color: var(--accent);
   text-decoration: none;
-  border-bottom: 1px solid rgba(0, 240, 255, 0.3);
+  border-bottom: 1px solid var(--accent-subtle);
   transition: border-color 0.2s, color 0.2s;
 }
 
 .chat-markdown .chat-link:hover {
-  color: #40f8ff;
-  border-bottom-color: #00f0ff;
+  color: var(--accent-hover);
+  border-bottom-color: var(--accent);
 }
 
-/* ── Horizontal rule ── */
-.chat-markdown .chat-hr {
-  margin: 1.5em 0;
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* ── Strong / Em ── */
+/* Strong / Em */
 .chat-markdown .chat-strong {
-  color: #ffffff;
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .chat-markdown .chat-em {
-  color: #c0c0dd;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
-/* ── Strikethrough (GFM) ── */
-.chat-markdown del {
-  color: #888;
-  text-decoration: line-through;
+/* Mermaid 12 orphan element suppression */
+body>[id^="dmermaid"],
+body>[id^="drender"],
+body>.error-icon,
+body>.error-text,
+body>svg[id^="dmermaid"],
+body>svg[id^="drender"],
+body>div:has(.error-icon) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  left: -99999px !important;
+  top: -99999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
 }
 
-/* ── Task list checkboxes (GFM) ── */
-.chat-markdown input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 1rem;
-  height: 1rem;
-  border: 2px solid #555;
-  border-radius: 0.25rem;
-  margin-right: 0.5rem;
-  vertical-align: middle;
-  position: relative;
-  cursor: default;
+/* User message bubble styling */
+.user-msg-bubble {
+  background-color: var(--accent, #2563eb) !important;
+  color: #ffffff !important;
 }
 
-.chat-markdown input[type="checkbox"]:checked {
-  background: #00f0ff;
-  border-color: #00f0ff;
-}
-
-.chat-markdown input[type="checkbox"]:checked::after {
-  content: '✓';
-  color: #0a0a0f;
-  font-size: 0.7rem;
-  font-weight: bold;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-/* ── Scrollbar inside code blocks ── */
-.chat-markdown .chat-code-body::-webkit-scrollbar,
-.chat-markdown .chat-table-wrapper::-webkit-scrollbar {
-  height: 6px;
-}
-
-.chat-markdown .chat-code-body::-webkit-scrollbar-track,
-.chat-markdown .chat-table-wrapper::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.chat-markdown .chat-code-body::-webkit-scrollbar-thumb,
-.chat-markdown .chat-table-wrapper::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
-}
-
-.chat-markdown .chat-code-body::-webkit-scrollbar-thumb:hover,
-.chat-markdown .chat-table-wrapper::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+.user-msg-bubble p {
+  color: #ffffff !important;
 }

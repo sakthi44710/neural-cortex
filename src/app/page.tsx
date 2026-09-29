@@ -24,7 +24,7 @@ const features = [
   {
     icon: MessageSquare,
     title: 'AI Conversation',
-    description: 'Chat with your knowledge using NVIDIA Llama 3.3 70B. Get answers with source citations.',
+    description: 'Chat with your knowledge using NVIDIA NIM AI. Get answers with source citations.',
     color: 'from-neon-pink to-rose-400',
   },
   {
@@ -121,7 +121,7 @@ export default function LandingPage() {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8">
               <Zap className="w-4 h-4 text-neon-blue" />
-              <span className="text-sm text-text-secondary">Powered by NVIDIA Llama 3.3 70B</span>
+              <span className="text-sm text-text-secondary">Powered by NVIDIA NIM AI</span>
             </div>
           </motion.div>
 

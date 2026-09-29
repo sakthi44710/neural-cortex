@@ -2,15 +2,42 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Network, Maximize2, RefreshCw, X, Link2, Zap, Tag, Loader2, Search } from 'lucide-react';
+import {
+  Network,
+  Maximize2,
+  Minimize2,
+  RefreshCw,
+  X,
+  Link2,
+  Zap,
+  Tag,
+  Loader2,
+  Search,
+  SlidersHorizontal,
+  Eye,
+  EyeOff,
+  ZoomIn,
+  ZoomOut,
+  Sparkles,
+  ArrowRight,
+  MessageSquare,
+  FileText,
+  HelpCircle,
+  ExternalLink,
+  Layers
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
 import toast from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center">
-      <div className="animate-pulse text-text-secondary">Loading graph engine...</div>
+    <div className="w-full h-full flex items-center justify-center bg-surface">
+      <div className="flex items-center gap-2 text-text-tertiary text-xs">
+        <Loader2 className="w-4 h-4 animate-spin text-slate-blue" />
+        <span>Loading Knowledge Graph engine...</span>
+      </div>
     </div>
   ),
 });
@@ -22,6 +49,7 @@ interface GraphNode {
   strength: number;
   val?: number;
   color?: string;
+  description?: string;
   x?: number;
   y?: number;
   fx?: number | null;
@@ -32,7 +60,7 @@ interface GraphLink {
   source: string | GraphNode;
   target: string | GraphNode;
   strength: number;
-  _bridge?: boolean; // invisible link to keep disconnected clusters nearby
+  _bridge?: boolean;
 }
 
 interface GraphData {
@@ -40,18 +68,21 @@ interface GraphData {
   links: GraphLink[];
 }
 
+// Muted, technical node colors communicating precise type semantics
 const typeColors: Record<string, string> = {
-  concept: '#00f0ff',
-  entity: '#b829f7',
-  document: '#ff0080',
-  idea: '#00ff88',
-  person: '#ffaa00',
-  technology: '#00aaff',
-  topic: '#ff6b6b',
-  organization: '#4ecdc4',
+  concept: '#3b82f6',     // Slate blue
+  entity: '#8b5cf6',      // Violet
+  document: '#10b981',    // Emerald
+  idea: '#f59e0b',        // Amber
+  person: '#6366f1',      // Indigo
+  technology: '#06b6d4',  // Cyan/teal
+  topic: '#ec4899',       // Rose
+  diagram: '#38bdf8',     // Sky blue
+  organization: '#14b8a6',// Teal
 };
 
 export default function StudioPage() {
+  const router = useRouter();
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +91,14 @@ export default function StudioPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<GraphNode[]>([]);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+  
+  // Graph Controls State
+  const [filterType, setFilterType] = useState<string>('all');
+  const [minStrength, setMinStrength] = useState<number>(0);
+  const [labelDisplayMode, setLabelDisplayMode] = useState<'auto' | 'all' | 'none'>('auto');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showGraphHelp, setShowGraphHelp] = useState(false);
+
   const graphRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -82,26 +121,23 @@ export default function StudioPage() {
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  // Configure d3 forces for a well-spaced, compact layout
+  // Configure gentle, readable D3 simulation forces
   useEffect(() => {
     if (graphRef.current) {
-      // Moderate repulsion with SHORT range — prevents distant scattering
-      graphRef.current.d3Force('charge')?.strength(-200).distanceMax(250);
-      // Link distances: bridge links are longer to separate clusters but keep them nearby
+      graphRef.current.d3Force('charge')?.strength(-160).distanceMax(280);
       graphRef.current.d3Force('link')?.distance((link: any) => {
-        if (link._bridge) return 200; // bridge links: keep clusters nearby but not overlapping
+        if (link._bridge) return 180;
         const sourceType = typeof link.source === 'string' ? '' : link.source?.type;
         const targetType = typeof link.target === 'string' ? '' : link.target?.type;
-        return sourceType === targetType ? 60 : 120;
+        return sourceType === targetType ? 55 : 110;
       }).strength((link: any) => {
-        return link._bridge ? 0.05 : 0.4; // bridge links: very weak pull
+        return link._bridge ? 0.04 : 0.45;
       });
-      // Strong centering — pulls everything toward the middle
-      graphRef.current.d3Force('center')?.strength(0.15);
+      graphRef.current.d3Force('center')?.strength(0.12);
     }
   }, [graphData]);
 
-  // Handle search
+  // Handle live search
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -121,8 +157,8 @@ export default function StudioPage() {
     setHighlightedNodeId(node.id);
     setSelectedNode(node);
     if (graphRef.current) {
-      graphRef.current.centerAt(node.x, node.y, 800);
-      graphRef.current.zoom(3.5, 800);
+      graphRef.current.centerAt(node.x, node.y, 700);
+      graphRef.current.zoom(3.2, 700);
     }
   }, []);
 
@@ -133,24 +169,22 @@ export default function StudioPage() {
 
       const allNodes = (data.nodes || []).map((n: GraphNode) => ({
         ...n,
-        val: Math.max((n.strength || 1) * 2.5, 3),
-        color: typeColors[n.type?.toLowerCase()] || '#ffffff',
+        val: Math.max((n.strength || 1) * 2.2, 3),
+        color: typeColors[n.type?.toLowerCase()] || '#3b82f6',
       }));
 
-      // Keep up to 80 nodes: all concepts/documents/ideas, strongest entities
-      const MAX_TOTAL_NODES = 80;
+      const MAX_TOTAL_NODES = 120;
       const importantNodes = allNodes.filter((n: GraphNode) => n.type !== 'entity');
       const entityNodes = allNodes
         .filter((n: GraphNode) => n.type === 'entity')
         .sort((a: GraphNode, b: GraphNode) => (b.strength || 1) - (a.strength || 1))
-        .slice(0, Math.max(MAX_TOTAL_NODES - importantNodes.length, 20));
+        .slice(0, Math.max(MAX_TOTAL_NODES - importantNodes.length, 30));
       const nodes = [...importantNodes, ...entityNodes];
       const nodeIds = new Set(nodes.map((n: GraphNode) => n.id));
 
-      // Filter links to only include visible nodes, limit links per node
       const allLinks: GraphLink[] = data.links || [];
       const linkCountPerNode = new Map<string, number>();
-      const MAX_LINKS_PER_NODE = 6;
+      const MAX_LINKS_PER_NODE = 7;
 
       const sortedLinks = [...allLinks].sort(
         (a: any, b: any) => (b.strength || 0) - (a.strength || 0)
@@ -160,7 +194,6 @@ export default function StudioPage() {
         const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
         const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
         if (!nodeIds.has(sourceId) || !nodeIds.has(targetId)) return false;
-        // Avoid self-loops
         if (sourceId === targetId) return false;
         const srcCount = linkCountPerNode.get(sourceId) || 0;
         const tgtCount = linkCountPerNode.get(targetId) || 0;
@@ -170,8 +203,7 @@ export default function StudioPage() {
         return true;
       });
 
-      // --- Bridge disconnected clusters so nothing flies off screen ---
-      // Find connected components using BFS
+      // Bridge disconnected clusters for unified canvas stability
       const adjacency = new Map<string, Set<string>>();
       nodes.forEach((n: GraphNode) => adjacency.set(n.id, new Set()));
       filteredLinks.forEach((link: any) => {
@@ -202,20 +234,14 @@ export default function StudioPage() {
         clusters.push(cluster);
       }
 
-      // If multiple clusters, connect each smaller cluster to the largest via an invisible bridge
       if (clusters.length > 1) {
-        // Sort: largest cluster first
         clusters.sort((a, b) => b.length - a.length);
-        const mainCluster = clusters[0];
-        const mainNodeId = mainCluster[0]; // anchor in main cluster
-
+        const mainNodeId = clusters[0][0];
         for (let i = 1; i < clusters.length; i++) {
-          // Connect this cluster's first node to main cluster's anchor
-          const bridgeSource = clusters[i][0];
           filteredLinks.push({
-            source: bridgeSource,
+            source: clusters[i][0],
             target: mainNodeId,
-            strength: 0.1,
+            strength: 0.08,
             _bridge: true,
           } as GraphLink);
         }
@@ -224,15 +250,15 @@ export default function StudioPage() {
       setGraphData({ nodes, links: filteredLinks });
     } catch (error) {
       console.error('Failed to fetch graph data:', error);
+      toast.error('Could not load knowledge graph');
     } finally {
       setLoading(false);
     }
   };
 
-  // Find all nodes connected to the selected node
+  // Find all nodes connected to selectedNode
   const connectedNodes = useMemo(() => {
     if (!selectedNode || !graphData.links.length) return [];
-
     const connectedIds = new Set<string>();
     for (const link of graphData.links) {
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
@@ -240,11 +266,9 @@ export default function StudioPage() {
       if (sourceId === selectedNode.id) connectedIds.add(targetId);
       if (targetId === selectedNode.id) connectedIds.add(sourceId);
     }
-
     return graphData.nodes.filter((n) => connectedIds.has(n.id));
   }, [selectedNode, graphData]);
 
-  // Set of connected node IDs for highlighting
   const connectedNodeIds = useMemo(() => {
     const ids = new Set<string>();
     if (selectedNode) {
@@ -254,10 +278,31 @@ export default function StudioPage() {
     return ids;
   }, [selectedNode, connectedNodes]);
 
-  // Set of search-matching node IDs
   const searchMatchIds = useMemo(() => {
     return new Set(searchResults.map((n) => n.id));
   }, [searchResults]);
+
+  // Filtered graph view based on selected controls
+  const visibleGraphData = useMemo(() => {
+    if (filterType === 'all' && minStrength === 0) {
+      return graphData;
+    }
+
+    const filteredNodes = graphData.nodes.filter((n) => {
+      const matchType = filterType === 'all' || n.type.toLowerCase() === filterType.toLowerCase();
+      const matchStrength = (n.strength || 1) >= minStrength;
+      return matchType && matchStrength;
+    });
+
+    const visibleNodeIds = new Set(filteredNodes.map((n) => n.id));
+    const filteredLinks = graphData.links.filter((link) => {
+      const sourceId = typeof link.source === 'string' ? link.source : (link.source as any)?.id;
+      const targetId = typeof link.target === 'string' ? link.target : (link.target as any)?.id;
+      return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+    });
+
+    return { nodes: filteredNodes, links: filteredLinks };
+  }, [graphData, filterType, minStrength]);
 
   const rebuildGraph = async () => {
     setRebuilding(true);
@@ -265,12 +310,12 @@ export default function StudioPage() {
       const res = await fetch('/api/brain/graph', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        toast.success(`Graph rebuilt: ${data.nodesCreated} new nodes, ${data.connectionsCreated} new connections`);
+        toast.success(`Graph rebuilt: ${data.nodesCreated} concepts, ${data.connectionsCreated} relationships`);
         await fetchGraphData();
       } else {
         toast.error('Failed to rebuild graph');
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to rebuild graph');
     } finally {
       setRebuilding(false);
@@ -281,15 +326,20 @@ export default function StudioPage() {
     setSelectedNode(node);
     setHighlightedNodeId(node.id);
     if (graphRef.current) {
-      graphRef.current.centerAt(node.x, node.y, 800);
-      graphRef.current.zoom(3.5, 800);
+      graphRef.current.centerAt(node.x, node.y, 700);
+      graphRef.current.zoom(3.2, 700);
     }
   }, []);
+
+  const handleAskAboutNode = (node: GraphNode) => {
+    const prompt = `Explain the concept "${node.label}" (${node.type}) and its relationship to connected concepts in my knowledge base.`;
+    router.push(`/converse?docId=${node.id}&title=${encodeURIComponent(node.label)}`);
+  };
 
   const paintNode = useCallback(
     (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const size = node.val || 4;
-      const color = node.color || '#ffffff';
+      const color = node.color || '#3b82f6';
       const isSelected = selectedNode?.id === node.id;
       const isConnected = selectedNode && connectedNodeIds.has(node.id);
       const isDimmed = selectedNode && !connectedNodeIds.has(node.id);
@@ -297,39 +347,26 @@ export default function StudioPage() {
       const isSearchMatch = searchQuery && searchMatchIds.has(node.id);
       const isSearchDimmed = searchQuery && searchResults.length > 0 && !searchMatchIds.has(node.id);
 
-      // Outer glow — larger for highlighted/selected
+      // Subtle outer aura
       ctx.beginPath();
-      const glowSize = isHighlighted ? 14 : isSelected ? 10 : isConnected ? 6 : isSearchMatch ? 8 : 3;
+      const glowSize = isHighlighted ? 10 : isSelected ? 8 : isConnected ? 5 : isSearchMatch ? 6 : 2;
       ctx.arc(node.x, node.y, size + glowSize, 0, 2 * Math.PI);
       if (isHighlighted) {
-        ctx.fillStyle = color + '60';
-      } else if (isSearchDimmed) {
-        ctx.fillStyle = 'rgba(255,255,255,0.02)';
-      } else if (isDimmed) {
-        ctx.fillStyle = 'rgba(255,255,255,0.03)';
+        ctx.fillStyle = color + '50';
+      } else if (isSearchDimmed || isDimmed) {
+        ctx.fillStyle = 'rgba(255,255,255,0.015)';
       } else if (isSearchMatch) {
-        ctx.fillStyle = color + '45';
+        ctx.fillStyle = color + '35';
       } else {
-        ctx.fillStyle = color + (isSelected ? '50' : isConnected ? '35' : '15');
+        ctx.fillStyle = color + (isSelected ? '40' : isConnected ? '25' : '10');
       }
       ctx.fill();
 
-      // Pulsing ring for highlighted node (search result focused)
-      if (isHighlighted) {
+      // Highlight focus dashed ring
+      if (isHighlighted || isSelected) {
         ctx.beginPath();
-        ctx.arc(node.x, node.y, size + 6, 0, 2 * Math.PI);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2 / globalScale;
-        ctx.setLineDash([4 / globalScale, 4 / globalScale]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      // Selection ring
-      if (isSelected && !isHighlighted) {
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, size + 4, 0, 2 * Math.PI);
-        ctx.strokeStyle = color;
+        ctx.arc(node.x, node.y, size + 5, 0, 2 * Math.PI);
+        ctx.strokeStyle = isHighlighted ? '#f59e0b' : color;
         ctx.lineWidth = 1.5 / globalScale;
         ctx.stroke();
       }
@@ -338,46 +375,44 @@ export default function StudioPage() {
       if (isSearchMatch && !isSelected && !isHighlighted) {
         ctx.beginPath();
         ctx.arc(node.x, node.y, size + 4, 0, 2 * Math.PI);
-        ctx.strokeStyle = '#ffaa00';
-        ctx.lineWidth = 1.5 / globalScale;
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.2 / globalScale;
         ctx.stroke();
       }
 
-      // Node body
+      // Solid Node Body
       ctx.beginPath();
       ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
-      ctx.fillStyle = (isSearchDimmed || isDimmed) ? color + '30' : color;
+      ctx.fillStyle = (isSearchDimmed || isDimmed) ? color + '25' : color;
       ctx.fill();
 
-      // Inner highlight for depth
-      if (!isDimmed && !isSearchDimmed) {
-        ctx.beginPath();
-        ctx.arc(node.x - size * 0.25, node.y - size * 0.25, size * 0.4, 0, 2 * Math.PI);
-        ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.fill();
+      // Label logic
+      let shouldShowLabel = false;
+      if (labelDisplayMode === 'all') {
+        shouldShowLabel = true;
+      } else if (labelDisplayMode === 'none') {
+        shouldShowLabel = isSelected || isHighlighted;
+      } else {
+        // Auto (Zoom-based LOD)
+        shouldShowLabel = isSelected || isHighlighted || isSearchMatch || isConnected || globalScale > 1.7;
       }
-
-      // Label logic: always show for selected/highlighted/search match, zoom-based for others
-      const shouldShowLabel =
-        isSelected || isHighlighted || isSearchMatch || isConnected || globalScale > 1.8;
 
       if (shouldShowLabel) {
         const fontSize = Math.max(
-          (isSelected || isHighlighted) ? 13 / globalScale : isSearchMatch ? 12 / globalScale : 10 / globalScale,
-          2
+          (isSelected || isHighlighted) ? 12 / globalScale : isSearchMatch ? 11 / globalScale : 9.5 / globalScale,
+          2.5
         );
-        ctx.font = `${(isSelected || isHighlighted || isSearchMatch) ? 'bold ' : ''}${fontSize}px Inter, system-ui, sans-serif`;
+        ctx.font = `${(isSelected || isHighlighted || isSearchMatch) ? '600 ' : '400 '}${fontSize}px Inter, -apple-system, sans-serif`;
 
-        const labelText = node.label.length > 24 ? node.label.slice(0, 22) + '…' : node.label;
-
-        // Text background for readability
+        const labelText = node.label.length > 22 ? node.label.slice(0, 20) + '…' : node.label;
         const textWidth = ctx.measureText(labelText).width;
         const bgPadding = 2 / globalScale;
-        const textY = node.y + size + 5;
+        const textY = node.y + size + 4;
 
+        // Clean label background
         ctx.fillStyle = (isSearchDimmed || isDimmed)
-          ? 'rgba(10, 10, 15, 0.3)'
-          : 'rgba(10, 10, 15, 0.7)';
+          ? 'rgba(15, 23, 42, 0.4)'
+          : 'rgba(15, 23, 42, 0.85)';
         ctx.fillRect(
           node.x - textWidth / 2 - bgPadding,
           textY - fontSize / 2,
@@ -385,82 +420,62 @@ export default function StudioPage() {
           fontSize + bgPadding
         );
 
-        ctx.fillStyle = (isSearchDimmed || isDimmed) ? 'rgba(255,255,255,0.2)' :
-          isHighlighted ? '#ffdd00' : isSearchMatch ? '#ffcc44' : '#ffffff';
+        ctx.fillStyle = (isSearchDimmed || isDimmed)
+          ? 'rgba(255,255,255,0.25)'
+          : isHighlighted ? '#f59e0b' : isSearchMatch ? '#fbbf24' : '#f8fafc';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillText(labelText, node.x, textY);
-
-        // Type badge below label for selected/highlighted
-        if ((isSelected || isHighlighted) && globalScale > 1.5) {
-          const badgeFontSize = Math.max(8 / globalScale, 1.5);
-          ctx.font = `${badgeFontSize}px Inter, system-ui, sans-serif`;
-          const typeText = node.type.toUpperCase();
-          ctx.fillStyle = color + '99';
-          ctx.fillText(typeText, node.x, textY + fontSize + 3);
-        }
       }
     },
-    [selectedNode, connectedNodeIds, highlightedNodeId, searchQuery, searchMatchIds, searchResults.length]
+    [selectedNode, connectedNodeIds, highlightedNodeId, searchQuery, searchMatchIds, searchResults.length, labelDisplayMode]
   );
 
-  // Link color
   const linkColor = useCallback(
     (link: any) => {
-      // Bridge links are always invisible
       if (link._bridge) return 'rgba(0, 0, 0, 0)';
 
       if (!selectedNode) {
-        // If searching, dim non-matching links
         if (searchQuery && searchResults.length > 0) {
           const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
           const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
           if (searchMatchIds.has(sourceId) || searchMatchIds.has(targetId)) {
-            return 'rgba(255, 200, 50, 0.5)';
+            return 'rgba(245, 158, 11, 0.45)';
           }
-          return 'rgba(255, 255, 255, 0.04)';
+          return 'rgba(148, 163, 184, 0.05)';
         }
-        return 'rgba(255, 255, 255, 0.15)';
+        return 'rgba(148, 163, 184, 0.16)';
       }
+
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
       const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
       if (sourceId === selectedNode.id || targetId === selectedNode.id) {
         const connectedNode = graphData.nodes.find(
           (n) => n.id === (sourceId === selectedNode.id ? targetId : sourceId)
         );
-        return (connectedNode?.color || '#00f0ff') + 'CC';
+        return (connectedNode?.color || '#3b82f6') + 'CC';
       }
-      return 'rgba(255, 255, 255, 0.04)';
+      return 'rgba(148, 163, 184, 0.04)';
     },
     [selectedNode, graphData.nodes, searchQuery, searchResults.length, searchMatchIds]
   );
 
-  // Link width
   const linkWidth = useCallback(
     (link: any) => {
-      // Bridge links have zero width (invisible)
       if (link._bridge) return 0;
-
       if (!selectedNode) {
-        if (searchQuery && searchResults.length > 0) {
-          const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
-          const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
-          if (searchMatchIds.has(sourceId) || searchMatchIds.has(targetId)) return 1.5;
-          return 0.2;
-        }
-        return 0.6;
+        return 0.75;
       }
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
       const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
       if (sourceId === selectedNode.id || targetId === selectedNode.id) {
-        return Math.max((link.strength || 1) * 2, 2);
+        return Math.max((link.strength || 1) * 1.8, 1.8);
       }
       return 0.2;
     },
-    [selectedNode, searchQuery, searchResults.length, searchMatchIds]
+    [selectedNode]
   );
 
-  // Count types for legend
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     graphData.nodes.forEach((n) => {
@@ -469,30 +484,51 @@ export default function StudioPage() {
     return counts;
   }, [graphData.nodes]);
 
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen().catch(() => {});
+      setIsFullscreen(false);
+    }
+  };
+
   return (
-    <div className="h-[calc(100vh-7rem)] max-w-7xl mx-auto relative">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Network className="w-6 h-6 text-neon-blue" />
-            Knowledge Studio
-          </h1>
-          <p className="text-text-secondary text-sm mt-1">
-            {graphData.nodes.length} nodes &bull; {graphData.links.length} connections
-          </p>
+    <div
+      ref={containerRef}
+      className={`h-[calc(100vh-6.5rem)] max-w-7xl mx-auto relative rounded-xl border border-border-custom bg-surface overflow-hidden shadow-sm flex flex-col ${
+        isFullscreen ? 'fixed inset-0 z-50 rounded-none border-none' : ''
+      }`}
+    >
+      {/* Top Technical Control Header */}
+      <div className="z-10 flex flex-wrap items-center justify-between p-3.5 border-b border-border-custom bg-surface/90 backdrop-blur-md gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-slate-blue/10 border border-slate-blue/20">
+            <Network className="w-4 h-4 text-slate-blue" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-semibold text-text-primary">Knowledge Studio</h1>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-surface-elevated border border-border-custom text-text-secondary font-mono">
+                {visibleGraphData.nodes.length} concepts &bull; {visibleGraphData.links.filter((l) => !l._bridge).length} relations
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Search Box */}
+
+        {/* Center / Right Control Cluster */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Quick Search */}
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary pointer-events-none" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary pointer-events-none" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search entities..."
-              className="pl-8 pr-8 py-2 rounded-xl glass text-sm bg-transparent border border-white/10 focus:border-neon-blue/50 focus:outline-none w-48 sm:w-56 transition-all placeholder:text-text-secondary/60"
+              placeholder="Find concept in graph..."
+              className="pl-8 pr-7 py-1.5 rounded-lg bg-surface-elevated border border-border-custom text-xs text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-slate-blue w-44 sm:w-56 transition-colors"
             />
             {searchQuery && (
               <button
@@ -501,146 +537,166 @@ export default function StudioPage() {
                   setHighlightedNodeId(null);
                   searchInputRef.current?.focus();
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-white/10"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-text-tertiary hover:text-text-primary"
               >
-                <X className="w-3.5 h-3.5 text-text-secondary" />
+                <X className="w-3 h-3" />
               </button>
             )}
           </div>
+
+          {/* Type Filter */}
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-border-custom text-xs text-text-primary focus:outline-none focus:border-slate-blue"
+          >
+            <option value="all">All Types</option>
+            {Object.keys(typeCounts).map((t) => (
+              <option key={t} value={t}>
+                {t.charAt(0).toUpperCase() + t.slice(1)} ({typeCounts[t]})
+              </option>
+            ))}
+          </select>
+
+          {/* Label Toggle */}
+          <button
+            onClick={() => {
+              if (labelDisplayMode === 'auto') setLabelDisplayMode('all');
+              else if (labelDisplayMode === 'all') setLabelDisplayMode('none');
+              else setLabelDisplayMode('auto');
+            }}
+            className="p-1.5 rounded-lg bg-surface-elevated border border-border-custom text-text-secondary hover:text-text-primary transition-colors text-xs flex items-center gap-1"
+            title={`Label Mode: ${labelDisplayMode}`}
+          >
+            {labelDisplayMode === 'none' ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5 text-slate-blue" />}
+            <span className="capitalize hidden sm:inline">{labelDisplayMode}</span>
+          </button>
+
+          {/* Zoom In & Out */}
+          <button
+            onClick={() => graphRef.current?.zoom(graphRef.current.zoom() * 1.3, 400)}
+            className="p-1.5 rounded-lg bg-surface-elevated border border-border-custom text-text-secondary hover:text-text-primary transition-colors"
+            title="Zoom In"
+          >
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => graphRef.current?.zoom(graphRef.current.zoom() / 1.3, 400)}
+            className="p-1.5 rounded-lg bg-surface-elevated border border-border-custom text-text-secondary hover:text-text-primary transition-colors"
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Fit to Viewport */}
+          <button
+            onClick={() => {
+              setSelectedNode(null);
+              setHighlightedNodeId(null);
+              graphRef.current?.zoomToFit(400, 50);
+            }}
+            className="p-1.5 rounded-lg bg-surface-elevated border border-border-custom text-text-secondary hover:text-text-primary transition-colors"
+            title="Fit to Screen"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Rebuild Knowledge Graph */}
           <button
             onClick={rebuildGraph}
             disabled={rebuilding}
-            className="px-3 py-2 rounded-xl glass hover:bg-white/10 transition-colors flex items-center gap-2 text-xs"
-            title="Rebuild graph from all documents"
+            className="px-3 py-1.5 rounded-lg bg-slate-blue text-white text-xs font-medium hover:bg-slate-blue/90 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            title="Extract new entities and sync connections from Vault"
           >
             {rebuilding ? (
-              <Loader2 className="w-4 h-4 animate-spin text-neon-blue" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <Zap className="w-4 h-4 text-neon-green" />
+              <Zap className="w-3.5 h-3.5" />
             )}
-            <span className="hidden sm:inline">{rebuilding ? 'Rebuilding...' : 'Rebuild'}</span>
+            <span className="hidden sm:inline">{rebuilding ? 'Syncing...' : 'Re-index'}</span>
           </button>
+
+          {/* Ask AI About Graph */}
           <button
-            onClick={() => {
-              setSelectedNode(null);
-              setHighlightedNodeId(null);
-              fetchGraphData();
-            }}
-            className="p-2 rounded-xl glass hover:bg-white/10 transition-colors"
-            title="Refresh"
+            onClick={() => router.push('/converse?prompt=' + encodeURIComponent('Analyze the topological relationships and clustering structure of my knowledge graph.'))}
+            className="px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-border-custom text-text-primary hover:border-slate-blue transition-colors text-xs font-medium flex items-center gap-1.5"
+            title="Ask AI about this knowledge graph"
           >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setSelectedNode(null);
-              setHighlightedNodeId(null);
-              graphRef.current?.zoomToFit(400, 60);
-            }}
-            className="p-2 rounded-xl glass hover:bg-white/10 transition-colors"
-            title="Fit to screen"
-          >
-            <Maximize2 className="w-4 h-4" />
+            <Sparkles className="w-3.5 h-3.5 text-slate-blue" />
+            <span className="hidden md:inline">Ask AI</span>
           </button>
         </div>
       </div>
 
-      {/* Search Results Dropdown */}
+      {/* Search Autocomplete Results */}
       <AnimatePresence>
         {searchQuery && searchResults.length > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: -5 }}
+            initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5 }}
-            className="absolute top-16 right-4 w-64 z-30 rounded-xl glass-strong border border-white/10 overflow-hidden shadow-2xl"
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute top-14 right-4 w-72 z-30 rounded-xl bg-surface border border-border-custom overflow-hidden shadow-lg"
           >
-            <div className="px-3 py-2 border-b border-white/10 text-xs text-text-secondary">
-              {searchResults.length} result{searchResults.length === 1 ? '' : 's'} found
+            <div className="px-3 py-2 border-b border-border-custom text-[11px] text-text-tertiary">
+              {searchResults.length} matching concept{searchResults.length === 1 ? '' : 's'}
             </div>
-            <div className="max-h-64 overflow-y-auto">
-              {searchResults.slice(0, 20).map((node) => (
+            <div className="max-h-60 overflow-y-auto">
+              {searchResults.slice(0, 15).map((node) => (
                 <button
                   key={node.id}
                   onClick={() => {
                     focusOnNode(node);
                     setSearchQuery('');
                   }}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/8 transition-colors text-left ${
-                    highlightedNodeId === node.id ? 'bg-white/10' : ''
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 hover:bg-surface-elevated transition-colors text-left ${
+                    highlightedNodeId === node.id ? 'bg-slate-blue/10' : ''
                   }`}
                 >
                   <div
                     className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: typeColors[node.type] || '#fff' }}
+                    style={{ backgroundColor: typeColors[node.type] || '#3b82f6' }}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm truncate">{node.label}</p>
-                    <p className="text-[10px] text-text-secondary capitalize">{node.type}</p>
+                    <p className="text-xs font-medium text-text-primary truncate">{node.label}</p>
+                    <p className="text-[10px] text-text-tertiary capitalize">{node.type}</p>
                   </div>
-                  <Zap className="w-3 h-3 text-text-secondary shrink-0" />
+                  <ArrowRight className="w-3 h-3 text-text-tertiary shrink-0" />
                 </button>
               ))}
             </div>
           </motion.div>
         )}
-        {searchQuery && searchResults.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5 }}
-            className="absolute top-16 right-4 w-64 z-30 rounded-xl glass-strong border border-white/10 overflow-hidden shadow-2xl"
-          >
-            <div className="px-3 py-4 text-center text-xs text-text-secondary">
-              No entities matching &ldquo;{searchQuery}&rdquo;
-            </div>
-          </motion.div>
-        )}
       </AnimatePresence>
 
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 z-10 p-3 rounded-xl glass">
-        <div className="flex flex-wrap items-center gap-3 text-xs">
-          {Object.entries(typeColors)
-            .filter(([type]) => typeCounts[type])
-            .map(([type, color]) => (
-              <button
-                key={type}
-                onClick={() => setSearchQuery(type)}
-                className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-                title={`Filter by ${type}`}
-              >
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-                <span className="text-text-secondary capitalize">{type}</span>
-                <span className="text-text-secondary/60">({typeCounts[type]})</span>
-              </button>
-            ))}
-        </div>
-      </div>
-
-      {/* Graph */}
-      <div ref={containerRef} className="w-full h-full rounded-2xl overflow-hidden bg-bg-primary">
+      {/* Main Canvas Area */}
+      <div className="flex-1 w-full h-full relative bg-[#090d16]">
         {loading ? (
           <div className="w-full h-full flex items-center justify-center">
             <div className="text-center">
-              <Network className="w-16 h-16 mx-auto mb-4 text-text-secondary opacity-20 animate-pulse" />
-              <p className="text-text-secondary">Loading knowledge graph...</p>
+              <Network className="w-12 h-12 mx-auto mb-3 text-text-tertiary animate-pulse" />
+              <p className="text-xs text-text-secondary">Rendering conceptual topology...</p>
             </div>
           </div>
-        ) : graphData.nodes.length === 0 ? (
-          <div className="w-full h-full flex items-center justify-center">
-            <div className="text-center">
-              <Network className="w-16 h-16 mx-auto mb-4 text-text-secondary opacity-20" />
-              <p className="text-lg font-medium mb-2">Your knowledge graph is empty</p>
-              <p className="text-text-secondary text-sm max-w-md">
-                Upload documents in the Vault and they will be processed with AI to extract entities
-                and build your knowledge graph.
+        ) : visibleGraphData.nodes.length === 0 ? (
+          <div className="w-full h-full flex items-center justify-center p-6">
+            <div className="text-center max-w-sm">
+              <Network className="w-12 h-12 mx-auto mb-3 text-text-tertiary" />
+              <h3 className="text-sm font-semibold text-text-primary mb-1">No Knowledge Nodes Found</h3>
+              <p className="text-xs text-text-secondary mb-4 leading-relaxed">
+                Upload documents to the Knowledge Vault to automatically extract entities and conceptual relationships.
               </p>
+              <button
+                onClick={() => router.push('/vault')}
+                className="px-3 py-1.5 rounded-lg bg-slate-blue text-white text-xs font-medium hover:bg-slate-blue/90 transition-all shadow-sm"
+              >
+                Go to Knowledge Vault
+              </button>
             </div>
           </div>
         ) : (
           <ForceGraph2D
             ref={graphRef}
-            graphData={graphData}
+            graphData={visibleGraphData}
             width={dimensions.width}
             height={dimensions.height}
             nodeCanvasObject={paintNode}
@@ -652,121 +708,157 @@ export default function StudioPage() {
             }}
             linkColor={linkColor}
             linkWidth={linkWidth}
-            linkCurvature={0.15}
-            linkDirectionalParticles={(link: any) => {
-              if (link._bridge) return 0; // no particles on invisible bridges
-              if (!selectedNode) return 0;
-              const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
-              const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
-              return sourceId === selectedNode.id || targetId === selectedNode.id ? 2 : 0;
-            }}
-            linkDirectionalParticleWidth={1.5}
-            linkDirectionalParticleSpeed={0.004}
-            linkDirectionalParticleColor={linkColor}
-            backgroundColor="#0a0a0f"
+            linkCurvature={0.12}
+            backgroundColor="#090d16"
             onNodeClick={handleNodeClick}
             onBackgroundClick={() => {
               setSelectedNode(null);
               setHighlightedNodeId(null);
             }}
-            warmupTicks={200}
-            cooldownTicks={300}
-            d3AlphaDecay={0.015}
+            warmupTicks={150}
+            cooldownTicks={250}
+            d3AlphaDecay={0.02}
             d3VelocityDecay={0.3}
-            d3AlphaMin={0.001}
             onEngineStop={() => graphRef.current?.zoomToFit(400, 50)}
             enableNodeDrag={true}
-            minZoom={0.3}
-            maxZoom={10}
+            minZoom={0.2}
+            maxZoom={8}
           />
         )}
-      </div>
 
-      {/* Node Detail Panel */}
-      <AnimatePresence>
-        {selectedNode && (
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="absolute top-20 right-4 w-80 rounded-2xl glass-strong neon-glow z-20 overflow-hidden"
-          >
-            {/* Header */}
-            <div className="p-4 border-b border-white/10">
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div
-                    className="w-3.5 h-3.5 rounded-full shrink-0 ring-2 ring-white/20"
-                    style={{ backgroundColor: typeColors[selectedNode.type] || '#fff' }}
-                  />
-                  <h3 className="font-semibold truncate">{selectedNode.label}</h3>
-                </div>
+        {/* Legend Overlay at Bottom-Left */}
+        <div className="absolute bottom-3 left-3 z-10 p-2.5 rounded-lg bg-surface/90 border border-border-custom backdrop-blur-md shadow-xs">
+          <div className="text-[10px] uppercase font-semibold text-text-tertiary mb-1.5 tracking-wider">
+            Semantic Types
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5 text-xs">
+            {Object.entries(typeColors)
+              .filter(([type]) => typeCounts[type])
+              .map(([type, color]) => (
                 <button
-                  onClick={() => {
-                    setSelectedNode(null);
-                    setHighlightedNodeId(null);
-                  }}
-                  className="p-1 rounded hover:bg-white/10 shrink-0 ml-2"
+                  key={type}
+                  onClick={() => setFilterType(filterType === type ? 'all' : type)}
+                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded transition-all ${
+                    filterType === type
+                      ? 'bg-slate-blue/15 text-slate-blue font-medium'
+                      : 'hover:bg-surface-elevated text-text-secondary'
+                  }`}
+                  title={`Click to filter by ${type}`}
                 >
-                  <X className="w-4 h-4" />
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+                  <span className="text-[11px] capitalize">{type}</span>
+                  <span className="text-[10px] text-text-tertiary">({typeCounts[type]})</span>
+                </button>
+              ))}
+          </div>
+        </div>
+
+        {/* Selected Node Inspection Slide-Out Panel */}
+        <AnimatePresence>
+          {selectedNode && (
+            <motion.div
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 24 }}
+              className="absolute top-3 right-3 bottom-3 w-80 rounded-xl bg-surface border border-border-custom shadow-xl z-20 flex flex-col overflow-hidden"
+            >
+              {/* Node Header */}
+              <div className="p-4 border-b border-border-custom">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className="w-3.5 h-3.5 rounded-full shrink-0"
+                      style={{ backgroundColor: typeColors[selectedNode.type] || '#3b82f6' }}
+                    />
+                    <h3 className="font-semibold text-sm text-text-primary truncate">{selectedNode.label}</h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedNode(null);
+                      setHighlightedNodeId(null);
+                    }}
+                    className="p-1 rounded text-text-tertiary hover:text-text-primary hover:bg-surface-elevated transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="px-2 py-0.5 rounded bg-surface-elevated border border-border-custom text-text-secondary capitalize text-[11px]">
+                    {selectedNode.type}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-surface-elevated border border-border-custom text-text-secondary text-[11px] font-mono">
+                    Weight: {(selectedNode.strength || 1).toFixed(1)}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-surface-elevated border border-border-custom text-text-secondary text-[11px] flex items-center gap-1">
+                    <Link2 className="w-3 h-3 text-slate-blue" />
+                    {connectedNodes.length} connected
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions Ribbon */}
+              <div className="p-3 border-b border-border-custom bg-surface-elevated/40 flex items-center gap-2">
+                <button
+                  onClick={() => handleAskAboutNode(selectedNode)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-blue text-white text-xs font-medium hover:bg-slate-blue/90 transition-all shadow-xs"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Ask AI Twin</span>
+                </button>
+                <button
+                  onClick={() => focusOnNode(selectedNode)}
+                  className="px-2.5 py-1.5 rounded-lg bg-surface border border-border-custom text-text-secondary hover:text-text-primary text-xs"
+                  title="Center & Zoom"
+                >
+                  Focus
                 </button>
               </div>
-              <div className="flex items-center gap-3 mt-2 text-xs text-text-secondary">
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5">
-                  <Tag className="w-3 h-3" />
-                  <span className="capitalize">{selectedNode.type}</span>
-                </span>
-                <span className="flex items-center gap-1">
-                  <Zap className="w-3 h-3" />
-                  Strength: {(selectedNode.strength || 1).toFixed(1)}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Link2 className="w-3 h-3" />
-                  {connectedNodes.length}
-                </span>
-              </div>
-            </div>
 
-            {/* Connected Nodes */}
-            <div className="p-4">
-              <p className="text-xs font-medium text-text-secondary mb-3 uppercase tracking-wider">
-                Connected To ({connectedNodes.length})
-              </p>
-              {connectedNodes.length === 0 ? (
-                <p className="text-xs text-text-secondary italic">No connections found</p>
-              ) : (
-                <div className="space-y-1 max-h-[40vh] overflow-y-auto pr-1">
-                  {connectedNodes
-                    .sort((a, b) => (b.strength || 1) - (a.strength || 1))
-                    .map((node) => (
-                    <button
-                      key={node.id}
-                      onClick={() => {
-                        const fullNode = graphData.nodes.find((n) => n.id === node.id);
-                        if (fullNode) focusOnNode(fullNode);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/8 transition-colors text-left group"
-                    >
-                      <div
-                        className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-transparent group-hover:ring-white/20 transition-all"
-                        style={{ backgroundColor: typeColors[node.type] || '#fff' }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm truncate group-hover:text-white transition-colors">
-                          {node.label}
-                        </p>
-                        <p className="text-[10px] text-text-secondary capitalize">
-                          {node.type} &bull; strength {(node.strength || 1).toFixed(1)}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
+              {/* Connected Relationships List */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-text-tertiary font-semibold uppercase tracking-wider">
+                  <span>Connected Concepts</span>
+                  <span>({connectedNodes.length})</span>
                 </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+                {connectedNodes.length === 0 ? (
+                  <p className="text-xs text-text-tertiary italic py-2">No direct topological connections.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {connectedNodes
+                      .sort((a, b) => (b.strength || 1) - (a.strength || 1))
+                      .map((node) => (
+                        <button
+                          key={node.id}
+                          onClick={() => {
+                            const fullNode = graphData.nodes.find((n) => n.id === node.id);
+                            if (fullNode) focusOnNode(fullNode);
+                          }}
+                          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-surface-elevated border border-transparent hover:border-border-custom transition-all text-left group"
+                        >
+                          <div
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: typeColors[node.type] || '#3b82f6' }}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-text-primary truncate group-hover:text-slate-blue transition-colors">
+                              {node.label}
+                            </p>
+                            <p className="text-[10px] text-text-tertiary capitalize">
+                              {node.type} &bull; weight {(node.strength || 1).toFixed(1)}
+                            </p>
+                          </div>
+                          <ArrowRight className="w-3 h-3 text-text-tertiary group-hover:text-slate-blue transition-colors" />
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

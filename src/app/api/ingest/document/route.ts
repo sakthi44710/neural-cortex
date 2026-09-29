@@ -3,7 +3,14 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { put } from '@vercel/blob';
-import { extractEntitiesWithTypes, extractKeyPoints, generateEmbeddingSimple, TypedEntity } from '@/lib/nvidia';
+import {
+  extractEntitiesWithTypes,
+  extractKeyPoints,
+  generateEmbeddingSimple,
+  TypedEntity,
+  evaluateVisualAndDiagram,
+  VisualEvaluationResult,
+} from '@/lib/nvidia';
 import { consensusSummarize } from '@/lib/agents';
 import { hfTranscribeAudio, isHuggingFaceConfigured } from '@/lib/huggingface';
 
@@ -19,15 +26,79 @@ function isTextFile(filename: string, mimeType: string): boolean {
 
 // --- Server-side binary file parsers for AI processing ---
 
+// Helper to extract embedded visuals (diagrams, flowcharts, architectures) from Office ZIP archives
+async function extractEmbeddedVisualsFromZip(
+  buffer: Buffer,
+  mediaFolderPrefix: string
+): Promise<{ filename: string; mimeType: string; buffer: Buffer }[]> {
+  try {
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(buffer);
+    const mediaFiles = Object.keys(zip.files).filter((name) => {
+      const lower = name.toLowerCase();
+      return (
+        lower.startsWith(mediaFolderPrefix) &&
+        (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.webp'))
+      );
+    });
+
+    const visuals: { filename: string; mimeType: string; buffer: Buffer }[] = [];
+    // Extract up to 3 primary visuals (>5KB to exclude tiny bullets/icons)
+    for (const filePath of mediaFiles.slice(0, 3)) {
+      const fileData = await zip.files[filePath].async('nodebuffer');
+      if (fileData.length >= 5000) {
+        const ext = getFileExtension(filePath);
+        const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+        visuals.push({
+          filename: filePath.split('/').pop() || 'embedded_visual',
+          mimeType,
+          buffer: fileData,
+        });
+      }
+    }
+    return visuals;
+  } catch (err) {
+    console.warn(`[Visual Extraction] Could not extract media from ${mediaFolderPrefix}:`, err);
+    return [];
+  }
+}
+
 async function extractTextFromDocx(buffer: Buffer): Promise<string> {
+  let docText = '';
   try {
     const mammoth = await import('mammoth');
     const result = await mammoth.extractRawText({ buffer });
-    return result.value || '';
+    docText = result.value || '';
   } catch (err) {
     console.error('DOCX parse error:', err);
-    return '';
   }
+
+  // Extract embedded images/diagrams from DOCX (word/media/)
+  try {
+    const embeddedImages = await extractEmbeddedVisualsFromZip(buffer, 'word/media/');
+    if (embeddedImages.length > 0) {
+      console.log(`[DOCX] Found ${embeddedImages.length} embedded visual(s). Evaluating diagrams...`);
+      const visualSections: string[] = [];
+      for (const img of embeddedImages) {
+        const evalResult = await evaluateVisualAndDiagram(img.buffer, img.mimeType, img.filename);
+        let section = `\n\n## Embedded Visual / Diagram: ${evalResult.title}\n`;
+        section += `**Type:** ${evalResult.diagramType.toUpperCase()}\n`;
+        section += `**Description:** ${evalResult.caption}\n`;
+        if (evalResult.mermaidCode && evalResult.mermaidCode.trim().length > 5) {
+          section += `\n\`\`\`mermaid\n${evalResult.mermaidCode.trim()}\n\`\`\`\n`;
+        }
+        if (evalResult.extractedText) {
+          section += `**Extracted Diagram Labels:** ${evalResult.extractedText}\n`;
+        }
+        visualSections.push(section);
+      }
+      docText += visualSections.join('\n');
+    }
+  } catch (diagErr) {
+    console.warn('[DOCX] Visual extraction failed (non-fatal):', diagErr);
+  }
+
+  return docText;
 }
 
 async function extractTextFromPdf(buffer: Buffer, filename?: string): Promise<string> {
@@ -81,10 +152,10 @@ async function extractTextFromPdf(buffer: Buffer, filename?: string): Promise<st
 
 
 async function extractTextFromPptx(buffer: Buffer): Promise<string> {
+  const texts: string[] = [];
   try {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(buffer);
-    const texts: string[] = [];
     const slideFiles = Object.keys(zip.files)
       .filter((name) => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
       .sort();
@@ -96,11 +167,34 @@ async function extractTextFromPptx(buffer: Buffer): Promise<string> {
         texts.push(slideText);
       }
     }
-    return texts.join('\n\n') || '';
   } catch (err) {
     console.error('PPTX parse error:', err);
-    return '';
   }
+
+  // Extract embedded slide diagrams & illustrations from PPTX (ppt/media/)
+  try {
+    const embeddedImages = await extractEmbeddedVisualsFromZip(buffer, 'ppt/media/');
+    if (embeddedImages.length > 0) {
+      console.log(`[PPTX] Found ${embeddedImages.length} embedded slide visual(s). Evaluating diagrams...`);
+      for (const img of embeddedImages) {
+        const evalResult = await evaluateVisualAndDiagram(img.buffer, img.mimeType, img.filename);
+        let section = `\n\n## Slide Diagram / Architecture: ${evalResult.title}\n`;
+        section += `**Visual Classification:** ${evalResult.diagramType.toUpperCase()}\n`;
+        section += `**Analysis:** ${evalResult.caption}\n`;
+        if (evalResult.mermaidCode && evalResult.mermaidCode.trim().length > 5) {
+          section += `\n\`\`\`mermaid\n${evalResult.mermaidCode.trim()}\n\`\`\`\n`;
+        }
+        if (evalResult.extractedText) {
+          section += `**Labels & Text:** ${evalResult.extractedText}\n`;
+        }
+        texts.push(section);
+      }
+    }
+  } catch (diagErr) {
+    console.warn('[PPTX] Visual extraction failed (non-fatal):', diagErr);
+  }
+
+  return texts.join('\n\n') || '';
 }
 
 async function extractTextFromFile(filename: string, buffer: Buffer, mimeType: string): Promise<string> {
@@ -116,11 +210,32 @@ async function extractTextFromFile(filename: string, buffer: Buffer, mimeType: s
     return extractTextFromPptx(buffer);
   }
 
-  // Image formats - use NVIDIA vision API for OCR
-  const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+  // Image & Visual formats - deep multimodal visual evaluation (OCR + captioning + Mermaid synthesis)
+  const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'];
   if (imageExtensions.includes(ext) || mimeType.startsWith('image/')) {
-    const { extractTextFromImage } = await import('@/lib/nvidia');
-    return extractTextFromImage(buffer, mimeType || `image/${ext}`);
+    console.log(`[Visual] Ingesting & evaluating visual asset: ${filename}...`);
+    try {
+      const visualEval = await evaluateVisualAndDiagram(buffer, mimeType || `image/${ext}`, filename);
+      const parts: string[] = [
+        `# Visual Analysis: ${visualEval.title}`,
+        `**Classification:** ${visualEval.isDiagram ? `Diagram / Technical Schema (${visualEval.diagramType})` : 'Graphic / Visual Document'}`,
+        `**Overview & Summary:**\n${visualEval.caption}`,
+      ];
+
+      if (visualEval.mermaidCode && visualEval.mermaidCode.trim().length > 5) {
+        parts.push(`### Synthesized Executable Diagram\n\`\`\`mermaid\n${visualEval.mermaidCode.trim()}\n\`\`\``);
+      }
+
+      if (visualEval.extractedText && visualEval.extractedText.trim().length > 0) {
+        parts.push(`### Extracted Text & Annotations (OCR)\n${visualEval.extractedText.trim()}`);
+      }
+
+      return parts.join('\n\n');
+    } catch (evalErr) {
+      console.error(`[Visual] Evaluation failed for ${filename}, falling back to basic OCR:`, evalErr);
+      const { extractTextFromImage } = await import('@/lib/nvidia');
+      return extractTextFromImage(buffer, mimeType || `image/${ext}`);
+    }
   }
 
   // Audio formats - transcribe with HuggingFace Whisper
@@ -289,6 +404,56 @@ async function processDocumentWithAI(docId: string, content: string, userId: str
         });
       } catch (connErr) {
         console.error(`[AI Process] Failed to update connections for node "${node.label}":`, connErr);
+      }
+    }
+
+    // Extract and index Diagram Knowledge Nodes if executable Mermaid blocks are present
+    const mermaidMatches = content.match(/```mermaid\s*([\s\S]*?)```/g);
+    if (mermaidMatches && mermaidMatches.length > 0) {
+      for (let idx = 0; idx < mermaidMatches.length; idx++) {
+        const rawBlock = mermaidMatches[idx];
+        const innerCode = rawBlock.replace(/```mermaid\s*/, '').replace(/```$/, '').trim();
+        if (innerCode.length > 5) {
+          const diagLabel = `Diagram: ${(doc?.title || 'System Diagram').slice(0, 100)}${mermaidMatches.length > 1 ? ` #${idx + 1}` : ''}`;
+          try {
+            const diagMeta = JSON.stringify({
+              isDiagram: true,
+              diagramType: innerCode.includes('sequenceDiagram') ? 'sequence' : innerCode.includes('erDiagram') ? 'er' : 'architecture',
+              mermaidCode: innerCode,
+              sourceDocId: docId,
+              sourceDocTitle: doc?.title,
+            });
+
+            const existingDiag = await prisma.knowledgeNode.findFirst({
+              where: { userId, label: diagLabel },
+            });
+
+            if (!existingDiag) {
+              const diagNode = await prisma.knowledgeNode.create({
+                data: {
+                  userId,
+                  label: diagLabel,
+                  type: 'diagram',
+                  description: `Synthesized executable diagram from ${doc?.title || 'document'}.`,
+                  strength: 2.5,
+                  connections: JSON.stringify([docNode.id, ...nodes.slice(0, 5).map((n: { id: string }) => n.id)]),
+                  metadata: diagMeta,
+                },
+              });
+              console.log(`[AI Process] ✅ Created diagram knowledge node: "${diagLabel}" (${diagNode.id})`);
+            } else {
+              await prisma.knowledgeNode.update({
+                where: { id: existingDiag.id },
+                data: {
+                  metadata: diagMeta,
+                  strength: existingDiag.strength + 0.5,
+                },
+              });
+            }
+          } catch (diagErr) {
+            console.warn('[AI Process] Failed to create diagram node:', diagErr);
+          }
+        }
       }
     }
 

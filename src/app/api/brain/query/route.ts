@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { nvidiaChat, nvidiaChatStream } from '@/lib/nvidia';
+import { nvidiaChat, nvidiaChatStream, generateConversationTitle, extractTopicFromMessage, generateEmbeddingSimple } from '@/lib/nvidia';
+import { cosineSimilarity } from '@/lib/utils';
 import {
   runAgents,
   buildAgentSystemPrompt,
   validateResponse,
   type DocumentForRAG,
 } from '@/lib/agents';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -20,11 +23,46 @@ export async function GET(req: NextRequest) {
 
   // List conversations
   if (searchParams.get('list') === 'true') {
-    const conversations = await prisma.conversation.findMany({
+    const rawConversations = await prisma.conversation.findMany({
       where: { userId: session.user.id },
       orderBy: { updatedAt: 'desc' },
-      select: { id: true, title: true, updatedAt: true },
+      select: {
+        id: true,
+        title: true,
+        updatedAt: true,
+        messages: {
+          where: { role: 'user' },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { content: true },
+        },
+      },
     });
+
+    // Auto-heal any conversations with "No Topic Specified" or generic titles
+    const conversations = await Promise.all(
+      rawConversations.map(async (c: any) => {
+        const isGeneric =
+          !c.title ||
+          /^(no topic|untitled|new chat|new conversation|conversation)/i.test(c.title.trim()) ||
+          /no topic specified/i.test(c.title);
+
+        if (isGeneric && c.messages && c.messages.length > 0) {
+          const firstMsg = c.messages[0].content;
+          const healedTitle = extractTopicFromMessage(firstMsg);
+          // Asynchronously update in database
+          prisma.conversation
+            .update({
+              where: { id: c.id },
+              data: { title: healedTitle },
+            })
+            .catch(() => {});
+          return { id: c.id, title: healedTitle, updatedAt: c.updatedAt };
+        }
+        return { id: c.id, title: c.title, updatedAt: c.updatedAt };
+      })
+    );
+
     return NextResponse.json({ conversations });
   }
 
@@ -84,14 +122,46 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Message required' }, { status: 400 });
   }
 
-  // Fetch user's documents for the multi-agent knowledge expert
-  const documents = await prisma.document.findMany({
+  // 1. Fetch lightweight metadata first for high-speed scoring
+  const docMeta = await prisma.document.findMany({
     where: { userId: session.user.id },
-    select: { id: true, title: true, content: true, summary: true, embedding: true },
+    select: { id: true, title: true, summary: true, embedding: true, domain: true },
   });
 
-  // Run multi-agent system: classifies intent → runs knowledge/search/youtube experts in parallel
-  const docsForRAG: DocumentForRAG[] = documents.map(
+  const queryEmbedding = generateEmbeddingSimple(message);
+  const queryWords = message.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
+
+  const scoredMeta = docMeta
+    .map((doc: any) => {
+      let score = 0;
+      const textToMatch = ((doc.title || '') + ' ' + (doc.summary || '') + ' ' + (doc.domain || '')).toLowerCase();
+      for (const word of queryWords) {
+        if (textToMatch.includes(word)) score += 2;
+      }
+      if (doc.embedding) {
+        try {
+          const docEmb = JSON.parse(doc.embedding);
+          score += cosineSimilarity(queryEmbedding, docEmb) * 5;
+        } catch {}
+      }
+      return { ...doc, score };
+    })
+    .sort((a: any, b: any) => b.score - a.score);
+
+  // Take top matched docs (up to 4)
+  const topDocs = scoredMeta.slice(0, 4);
+  const topIds = topDocs.map((d: any) => d.id);
+
+  // Fetch full content ONLY for the top matched documents
+  const fullDocs = topIds.length > 0
+    ? await prisma.document.findMany({
+        where: { id: { in: topIds } },
+        select: { id: true, title: true, content: true, summary: true, embedding: true },
+      })
+    : [];
+
+  // Run multi-agent system with the selectively retrieved documents
+  const docsForRAG: DocumentForRAG[] = fullDocs.map(
     (d: { id: string; title: string; content: string; summary: string | null; embedding: string | null }) => ({
       id: d.id,
       title: d.title,
@@ -102,6 +172,51 @@ export async function POST(req: NextRequest) {
   );
 
   const agentContext = await runAgents(message, docsForRAG);
+
+  // Ingest relevant diagram nodes from the user's Knowledge Graph
+  const isDiagramQuery = /\b(diagram|architecture|flowchart|flow|mermaid|visual|schema|model|process|graph|pipeline)\b/i.test(message);
+  if (isDiagramQuery) {
+    try {
+      const diagramNodes = await prisma.knowledgeNode.findMany({
+        where: {
+          userId: session.user.id,
+          type: 'diagram',
+        },
+        take: 4,
+        orderBy: { updatedAt: 'desc' },
+        select: { id: true, label: true, description: true, metadata: true },
+      });
+
+      if (diagramNodes.length > 0) {
+        const diagramSnippets = diagramNodes
+          .map((node: any) => {
+            let mermaidCode = '';
+            try {
+              if (node.metadata) {
+                const meta = JSON.parse(node.metadata);
+                if (meta.mermaidCode) {
+                  mermaidCode = `\n\`\`\`mermaid\n${meta.mermaidCode}\n\`\`\``;
+                }
+              }
+            } catch {}
+            return `### Saved Vault Diagram: ${node.label}\n${node.description || ''}${mermaidCode}`;
+          })
+          .join('\n\n');
+
+        if (diagramSnippets) {
+          agentContext.knowledgeContext = (agentContext.knowledgeContext || '') + '\n\n## Relevant Diagrams From Knowledge Vault:\n\n' + diagramSnippets;
+          diagramNodes.forEach((node: any) => {
+            agentContext.sources.push({
+              type: 'diagram',
+              title: `Diagram: ${node.label}`,
+            });
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load diagram nodes for RAG:', e);
+    }
+  }
 
   // Cross-conversation knowledge: pull relevant messages from OTHER conversations
   let crossConvoContext = '';
@@ -169,7 +284,7 @@ export async function POST(req: NextRequest) {
     convo = await prisma.conversation.create({
       data: {
         userId: session.user.id,
-        title: message.slice(0, 80),
+        title: 'New Conversation',
       },
     });
   }
@@ -180,6 +295,23 @@ export async function POST(req: NextRequest) {
     orderBy: { createdAt: 'asc' },
     take: 10,
   });
+
+  // Generate an intelligent 2-4 word AI topic title for new conversations or raw prompt slices
+  const isNew = !conversationId || history.length === 0;
+  const needsTitleGeneration =
+    isNew ||
+    convo.title === 'New Conversation' ||
+    convo.title === 'No Topic Specified' ||
+    /no topic/i.test(convo.title) ||
+    convo.title === message.slice(0, 80) ||
+    convo.title.length > 50;
+
+  const titlePromise = needsTitleGeneration
+    ? generateConversationTitle(message).catch((err) => {
+        console.error('Failed to generate AI title:', err);
+        return extractTopicFromMessage(message);
+      })
+    : null;
 
   // Save user message
   await prisma.message.create({
@@ -205,13 +337,13 @@ export async function POST(req: NextRequest) {
   // Combine sources from all agents (documents, web search, YouTube)
   const sources = agentContext.sources;
 
-  // Streaming response
+  // Streaming response (temperature 0.1 for deterministic, consistent answers)
   if (useStream) {
     try {
       const aiStream = await nvidiaChatStream({
         messages: aiMessages,
         maxTokens: 2048,
-        temperature: 0.7,
+        temperature: 0.1,
       });
 
       let fullResponse = '';
@@ -219,7 +351,7 @@ export async function POST(req: NextRequest) {
       const decoder = new TextDecoder();
 
       const transformStream = new TransformStream<Uint8Array, Uint8Array>({
-        transform(chunk, controller) {
+        async transform(chunk, controller) {
           const text = decoder.decode(chunk, { stream: true });
           // Extract content from SSE data
           const lines = text.split('\n');
@@ -227,8 +359,34 @@ export async function POST(req: NextRequest) {
             if (line.startsWith('data: ')) {
               const data = line.slice(6).trim();
               if (data === '[DONE]') {
-                // Send metadata at end
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: convo!.id, sources })}\n\n`));
+                // Resolve AI title if pending
+                let finalTitle = convo!.title;
+                if (titlePromise) {
+                  try {
+                    const aiTitle = await titlePromise;
+                    if (aiTitle) {
+                      finalTitle = aiTitle;
+                      await prisma.conversation.update({
+                        where: { id: convo!.id },
+                        data: { title: aiTitle },
+                      });
+                    }
+                  } catch (e) {
+                    console.error('Failed to update conversation title in stream:', e);
+                  }
+                }
+
+                // Send metadata at end including the AI conversationTitle
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      done: true,
+                      conversationId: convo!.id,
+                      conversationTitle: finalTitle,
+                      sources,
+                    })}\n\n`
+                  )
+                );
                 return;
               }
               try {
@@ -266,7 +424,7 @@ export async function POST(req: NextRequest) {
         headers: {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
+          Connection: 'keep-alive',
         },
       });
     } catch (error) {
@@ -275,17 +433,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Non-streaming response with multi-model fact-check validation
+  // Non-streaming response with deterministic temperature and multi-model fact-check validation
   try {
     const rawResponse = await nvidiaChat({
       messages: aiMessages,
       maxTokens: 2048,
-      temperature: 0.7,
+      temperature: 0.1,
     });
 
     // Cross-validate with HuggingFace model to reduce hallucination
     const validationContext = [agentContext.knowledgeContext, agentContext.searchContext, agentContext.youtubeContext].filter(Boolean).join('\n\n');
-    const response = await validateResponse(rawResponse, message, validationContext);
+    const response = await validateResponse(message, rawResponse, validationContext);
 
     // Save assistant message
     await prisma.message.create({
@@ -297,15 +455,31 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Update conversation timestamp
-    await prisma.conversation.update({
-      where: { id: convo.id },
-      data: { updatedAt: new Date() },
-    });
+    let finalTitle = convo.title;
+    if (titlePromise) {
+      try {
+        const aiTitle = await titlePromise;
+        if (aiTitle) {
+          finalTitle = aiTitle;
+          await prisma.conversation.update({
+            where: { id: convo.id },
+            data: { title: aiTitle, updatedAt: new Date() },
+          });
+        }
+      } catch (e) {
+        console.error('Failed to update title:', e);
+      }
+    } else {
+      await prisma.conversation.update({
+        where: { id: convo.id },
+        data: { updatedAt: new Date() },
+      });
+    }
 
     return NextResponse.json({
       response,
       conversationId: convo.id,
+      conversationTitle: finalTitle,
       sources,
     });
   } catch (error) {
@@ -313,9 +487,9 @@ export async function POST(req: NextRequest) {
     const errMsg = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
       {
-        response:
-          `I encountered an error: ${errMsg}. Please try again in a moment.`,
+        response: `I encountered an error: ${errMsg}. Please try again in a moment.`,
         conversationId: convo.id,
+        conversationTitle: convo.title,
         sources: [],
       },
       { status: 200 } // return 200 so frontend shows the message

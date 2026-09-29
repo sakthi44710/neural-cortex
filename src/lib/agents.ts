@@ -26,7 +26,7 @@
  * └─────────────────────────────────────────────────────────┘
  *
  * Models Used:
- * NVIDIA  → Llama 3.3 70B (primary), Mistral Large 2 (fallback)
+ * NVIDIA  → Llama 3.2 Vision (primary), Nemotron 3 / GPT-OSS (fallbacks)
  * HF      → Mistral 7B (validation), BART (summarization), Whisper (audio)
  */
 
@@ -266,7 +266,12 @@ export async function validateResponse(
   if (!isHuggingFaceConfigured()) return response;
 
   try {
-    const validation = await hfChat({
+    // 4 second timeout so fact check never blocks or delays user response
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Validation timeout')), 4000)
+    );
+
+    const validationPromise = hfChat({
       messages: [
         {
           role: 'system',
@@ -284,6 +289,8 @@ Be brief.`,
       temperature: 0.1,
     });
 
+    const validation = await Promise.race([validationPromise, timeoutPromise]);
+
     if (validation.includes('VALIDATED') || !validation.includes('ISSUES')) {
       return response;
     }
@@ -292,8 +299,8 @@ Be brief.`,
     console.log('[Agent] Fact-check found issues:', validation);
     return response + '\n\n> ⚠️ *Some claims in this response may need verification. Cross-reference with your source documents for accuracy.*';
   } catch (err) {
-    console.error('[Agent] Fact-check validation failed:', err);
-    return response; // Return original on failure
+    // Fail silently and fast
+    return response;
   }
 }
 
@@ -374,13 +381,13 @@ export function buildAgentSystemPrompt(
 
   // Core identity
   sections.push(
-    `You are Neural Cortex, an advanced AI knowledge twin powered by a multi-model mixture of experts system. You help users recall, connect, and build upon their knowledge.`
+    `You are Neural Cortex, a state-of-the-art AI knowledge intelligence platform and cognitive twin powered by high-performance neural models and dynamic knowledge retrieval. You deliver authoritative, exhaustive, beautifully structured responses comparable to the best capabilities of modern frontier AI assistants.`
   );
 
   // Knowledge base context
   if (agentContext.knowledgeContext) {
     sections.push(
-      `## Your Knowledge Base (User's Documents):\n\n${agentContext.knowledgeContext}`
+      `## Ground Truth Knowledge Base (User's Vault Documents):\n\n${agentContext.knowledgeContext}`
     );
   }
 
@@ -400,17 +407,49 @@ export function buildAgentSystemPrompt(
   }
 
   // Instructions
-  sections.push(`## Response Guidelines:
-- Use markdown formatting for readability
-- When referencing documents, mention their titles clearly
-- When providing web search results, ALWAYS include the actual clickable URLs/links
-- When recommending YouTube videos, ALWAYS include the full YouTube watch URL
-- When referencing previous conversations, mention that naturally
-- Clearly distinguish between: facts from user's documents, web search results, and your general knowledge
-- If you're uncertain about something, say so explicitly
-- Suggest connections between concepts when you notice them
-- For questions that need external info (current events, specific websites, tutorials), USE the search results provided
-- Keep responses focused and helpful`);
+  sections.push(`## Comprehensive Response & Presentation Guidelines:
+
+1. **Deterministic Consistency & Grounding**:
+   - Provide definitive, consistent answers grounded firmly in the user's knowledge base and provided sources.
+   - When asked the same or equivalent question repeatedly, maintain the same core facts, conclusions, and structured depth. Answers should only evolve or change when new notes, concepts, or documents are added to the knowledge vault.
+   - When referencing user documents, explicitly cite their titles.
+
+2. **Interactive Diagrams & Visual Models (CRITICAL)**:
+   - When explaining workflows, architectures, pipelines, lifecycle stages, system components, mindmaps, or relationships, GENERATE interactive Mermaid diagrams in markdown code blocks (\`\`\`mermaid).
+   - The user interface automatically compiles these into dynamic visual graphics with zoom, pan, copy, and fullscreen inspection!
+   - SYNTAX RULES FOR ZERO ERRORS:
+     * ALWAYS enclose node labels in double quotes inside brackets: e.g. A["User Request (SQL)"] --> B["Query Parser & Lexer"], NOT A[User Request (SQL)]. Unquoted parentheses, brackets, or slashes inside labels cause syntax errors.
+     * Keep node IDs simple: A, B, C, D1, D2.
+     * Examples:
+       - Flowchart: \`\`\`mermaid
+graph TD
+  A["User Query"] --> B["Query Parser"]
+  B --> C["Query Optimizer"]
+  C --> D["Storage Engine"]
+\`\`\`
+       - Sequence: \`\`\`mermaid
+sequenceDiagram
+  Client->>Server: Request Data
+  Server-->>Client: Return JSON
+\`\`\`
+
+
+3. **Advanced Visual Styling & Layout**:
+   - Use comparison tables for features, pros/cons, or metrics (\`| Metric | Approach A | Approach B |\`).
+   - Use GitHub-style alert callouts to emphasize key takeaways:
+     > [!NOTE]
+     > Helpful contextual note or detail.
+     > [!TIP]
+     > Pro-tip or best practice recommendation.
+     > [!IMPORTANT]
+     > Critical takeaway or key fact.
+     > [!WARNING]
+     > Potential pitfall or edge case.
+   - Use fenced code blocks with proper language identifiers for code, commands, or data formats.
+   - For web search and YouTube results, always output markdown hyperlinks ([Title](url)).
+
+4. **Tone & Depth**:
+   - Highly articulate, clear, organized with section headers (\`###\`), concise bullets, and deep conceptual precision.`);
 
   return sections.join('\n\n');
 }

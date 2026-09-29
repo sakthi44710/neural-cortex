@@ -8,8 +8,15 @@
  * - openai/whisper-large-v3              (audio/video transcription)
  */
 
-const HF_API_URL = 'https://api-inference.huggingface.co';
-const HF_API_KEY = process.env.HUGGINGFACE_API_KEY;
+const HF_API_URL = 'https://router.huggingface.co/hf-inference';
+
+function getHfApiKey(): string {
+  const key = process.env.HUGGINGFACE_API_KEY;
+  if (!key) {
+    throw new Error('HUGGINGFACE_API_KEY is not configured');
+  }
+  return key;
+}
 
 const HF_CHAT_MODELS = [
   'mistralai/Mistral-7B-Instruct-v0.3',
@@ -19,14 +26,14 @@ const HF_CHAT_MODELS = [
 const HF_SUMMARIZATION_MODEL = 'facebook/bart-large-cnn';
 const HF_WHISPER_MODEL = 'openai/whisper-large-v3';
 
-const HF_TIMEOUT = 60_000; // 60s — HF free tier models may need cold-start time
+const HF_TIMEOUT = 8_000; // 8s — fast fail so user chat is never blocked
 
 // ─── Helpers ───────────────────────────────────────────────
 
 async function hfFetchWithRetry(
   url: string,
   init: RequestInit,
-  retries = 2,
+  retries = 1,
   timeoutMs = HF_TIMEOUT
 ): Promise<Response> {
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -71,10 +78,7 @@ interface HFChatOptions {
 
 export async function hfChat(options: HFChatOptions): Promise<string> {
   const { messages, maxTokens = 1024, temperature = 0.7, model } = options;
-
-  if (!HF_API_KEY) {
-    throw new Error('HUGGINGFACE_API_KEY is not configured');
-  }
+  const apiKey = getHfApiKey();
 
   const modelsToTry = model ? [model] : HF_CHAT_MODELS;
   let lastError: Error | null = null;
@@ -86,7 +90,7 @@ export async function hfChat(options: HFChatOptions): Promise<string> {
         {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${HF_API_KEY}`,
+            Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -124,7 +128,7 @@ export async function hfChat(options: HFChatOptions): Promise<string> {
 // ─── Summarization (BART) ──────────────────────────────────
 
 export async function hfSummarize(text: string): Promise<string> {
-  if (!HF_API_KEY) throw new Error('HUGGINGFACE_API_KEY not configured');
+  const apiKey = getHfApiKey();
 
   const truncated = text.slice(0, 3000); // BART has a 1024-token limit, ~3k chars safe
 
@@ -134,7 +138,7 @@ export async function hfSummarize(text: string): Promise<string> {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${HF_API_KEY}`,
+          Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -168,7 +172,7 @@ export async function hfTranscribeAudio(
   buffer: Buffer,
   mimeType: string = 'audio/mpeg'
 ): Promise<string> {
-  if (!HF_API_KEY) throw new Error('HUGGINGFACE_API_KEY not configured');
+  const apiKey = getHfApiKey();
 
   console.log(`[HF Whisper] Transcribing ${(buffer.length / 1024 / 1024).toFixed(1)} MB of ${mimeType}...`);
 
@@ -178,7 +182,7 @@ export async function hfTranscribeAudio(
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${HF_API_KEY}`,
+          Authorization: `Bearer ${apiKey}`,
           'Content-Type': mimeType,
         },
         body: new Uint8Array(buffer),
@@ -206,5 +210,5 @@ export async function hfTranscribeAudio(
 // ─── Check if HuggingFace is configured ────────────────────
 
 export function isHuggingFaceConfigured(): boolean {
-  return !!HF_API_KEY;
+  return !!process.env.HUGGINGFACE_API_KEY;
 }

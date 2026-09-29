@@ -12,43 +12,58 @@ interface NavbarProps {
 }
 
 export default function Navbar({ user }: NavbarProps) {
+  const triggerCommandPalette = () => {
+    window.dispatchEvent(new CustomEvent('open-command-palette'));
+  };
+
   return (
-    <header className="h-16 border-b border-border-custom bg-bg-secondary/50 backdrop-blur-xl flex items-center justify-between px-6 shrink-0">
-      {/* Search */}
+    <header className="h-14 border-b border-border-custom bg-surface/80 backdrop-blur-md flex items-center justify-between px-5 shrink-0 z-30 select-none">
+      {/* Global Search Button / Command Palette Trigger */}
       <div className="flex items-center gap-2">
-        <button className="flex items-center gap-3 px-4 py-2 rounded-xl glass text-text-secondary hover:text-white transition-colors">
-          <Search className="w-4 h-4" />
-          <span className="text-sm hidden sm:inline">Search knowledge...</span>
-          <kbd className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded bg-bg-tertiary text-xs">
-            <Command className="w-3 h-3" /> K
+        <button
+          onClick={triggerCommandPalette}
+          className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-surface-elevated border border-border-custom text-text-muted hover:text-text-primary hover:border-accent/40 transition-all text-xs group"
+          aria-label="Search knowledge base"
+        >
+          <Search className="w-3.5 h-3.5 text-text-muted group-hover:text-accent transition-colors" />
+          <span className="hidden sm:inline">Search knowledge...</span>
+          <kbd className="hidden md:flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-surface border border-border-subtle text-[10px] font-mono text-text-muted">
+            <Command className="w-2.5 h-2.5" /> K
           </kbd>
         </button>
       </div>
 
-      {/* Right side */}
-      <div className="flex items-center gap-4">
-        <button className="relative p-2 rounded-xl hover:bg-white/5 transition-colors">
-          <Bell className="w-5 h-5 text-text-secondary" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-neon-pink" />
+      {/* Right side telemetry & User profile */}
+      <div className="flex items-center gap-3">
+        {/* Subtle notifications trigger */}
+        <button
+          onClick={triggerCommandPalette}
+          className="relative p-1.5 rounded-lg hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors"
+          title="Notifications"
+          aria-label="Notifications"
+        >
+          <Bell className="w-4 h-4" />
+          <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-accent" />
         </button>
 
-        <div className="flex items-center gap-3 pl-4 border-l border-border-custom">
+        {/* User Info */}
+        <div className="flex items-center gap-2.5 pl-3 border-l border-border-subtle">
           {user.image ? (
             <Image
               src={user.image}
               alt={user.name || 'User'}
-              width={32}
-              height={32}
-              className="rounded-full"
+              width={28}
+              height={28}
+              className="rounded-lg object-cover"
             />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-neon-blue to-neon-purple flex items-center justify-center text-sm font-bold">
-              {user.name?.charAt(0) || 'U'}
+            <div className="w-7 h-7 rounded-lg bg-accent text-white flex items-center justify-center text-xs font-semibold shadow-sm">
+              {user.name?.charAt(0)?.toUpperCase() || 'U'}
             </div>
           )}
-          <div className="hidden sm:block">
-            <p className="text-sm font-medium">{user.name || 'User'}</p>
-            <p className="text-xs text-text-secondary">{user.email}</p>
+          <div className="hidden sm:block text-left">
+            <p className="text-xs font-medium text-text-primary leading-tight">{user.name || 'User'}</p>
+            <p className="text-[10px] text-text-muted leading-tight">{user.email || 'Knowledge Operator'}</p>
           </div>
         </div>
       </div>

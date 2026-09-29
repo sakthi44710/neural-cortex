@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import Sidebar from '@/components/shared/Sidebar';
 import Navbar from '@/components/shared/Navbar';
+import CommandPalette from '@/components/shared/CommandPalette';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -18,7 +19,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex h-screen bg-bg-primary">
+    <div className="flex h-screen bg-bg-primary text-text-primary">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar user={session.user} />
@@ -26,6 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {children}
         </main>
       </div>
+      <CommandPalette />
     </div>
   );
 }

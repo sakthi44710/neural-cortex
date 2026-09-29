@@ -15,11 +15,11 @@ export const metadata: Metadata = {
   description: 'Your AI-powered cognitive extension. Store, connect, and amplify your knowledge with advanced AI.',
 };
 
-// Critical inline CSS to prevent FOUC (Flash of Unstyled Content)
+// Critical inline CSS to prevent FOUC (Flash of Unstyled Content) and honor theme variables
 const criticalCSS = `
   html, body {
-    background: #0a0a0f !important;
-    color: #ffffff !important;
+    background: var(--bg-primary, #090d16) !important;
+    color: var(--text-primary, #f1f5f9) !important;
     margin: 0;
     padding: 0;
     min-height: 100vh;
@@ -30,14 +30,29 @@ const criticalCSS = `
     box-sizing: border-box;
   }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: #0a0a0f; }
-  ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+  ::-webkit-scrollbar-track { background: var(--bg-primary, #090d16); }
+  ::-webkit-scrollbar-thumb { background: var(--border-custom, #334155); border-radius: 3px; }
+`;
+
+const themeInitScript = `
+  (function() {
+    try {
+      var saved = localStorage.getItem('nc_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', saved);
+      if (saved === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        document.documentElement.classList.add('dark');
+      }
+    } catch (e) {}
+  })();
 `;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <style dangerouslySetInnerHTML={{ __html: criticalCSS }} />
       </head>
       <body className={`${inter.className} antialiased`}>
