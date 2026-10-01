@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     ] = await Promise.all([
       prisma.document.count({ where: { userId } }),
       prisma.conversation.count({ where: { userId } }),
-      prisma.knowledgeNode.count({ where: { userId } }),
+      prisma.knowledgeNode.count({ where: { userId, type: { notIn: ['study_artifact'] } } }),
       prisma.document.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         },
       }),
       prisma.knowledgeNode.findMany({
-        where: { userId },
+        where: { userId, type: { notIn: ['study_artifact'] } },
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,
@@ -63,12 +63,18 @@ export async function GET(req: NextRequest) {
         where: { userId, createdAt: { gte: sevenDaysAgo } },
       }),
       prisma.knowledgeNode.count({
-        where: { userId, createdAt: { gte: sevenDaysAgo } },
+        where: { userId, type: { notIn: ['study_artifact'] }, createdAt: { gte: sevenDaysAgo } },
       }),
       prisma.conversation.count({
         where: { userId, createdAt: { gte: sevenDaysAgo } },
       }),
     ]);
+
+    // Defensive check: filter out any nodes with raw CUIDs or internal hashes
+    const isRawId = (str: string) => /^c[a-z0-9]{20,}$/i.test(str) || /^[0-9a-f-]{32,}$/i.test(str);
+    const validNodes = (allNodes || []).filter(
+      (n) => n.label && typeof n.label === 'string' && !isRawId(n.label.trim()) && n.type !== 'study_artifact'
+    );
 
     // 1. Calculate actual relationships & connection network
     let totalRelationships = 0;
@@ -80,16 +86,17 @@ export async function GET(req: NextRequest) {
     }[] = [];
 
     const nodeLabelMap = new Map<string, string>();
-    allNodes.forEach((n) => nodeLabelMap.set(n.id, n.label));
+    validNodes.forEach((n) => nodeLabelMap.set(n.id, n.label));
 
-    allNodes.forEach((node) => {
+    validNodes.forEach((node) => {
       if (node.connections) {
         try {
           const parsed = JSON.parse(node.connections);
           if (Array.isArray(parsed)) {
             totalRelationships += parsed.length;
             parsed.forEach((targetId: string) => {
-              const targetLabel = nodeLabelMap.get(targetId) || targetId;
+              const targetLabel = nodeLabelMap.get(targetId);
+              if (!targetLabel || isRawId(targetLabel)) return;
               connectionsList.push({
                 source: node.label,
                 target: targetLabel,

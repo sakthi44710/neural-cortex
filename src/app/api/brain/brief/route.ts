@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
   ] = await Promise.all([
     prisma.document.count({ where: { userId } }),
     prisma.conversation.count({ where: { userId } }),
-    prisma.knowledgeNode.count({ where: { userId } }),
+    prisma.knowledgeNode.count({ where: { userId, type: { notIn: ['study_artifact'] } } }),
     prisma.insight.count({ where: { userId } }),
     prisma.document.findMany({
       where: { userId },
@@ -61,7 +61,8 @@ export async function GET(req: NextRequest) {
       select: { id: true, title: true, updatedAt: true },
     }),
     prisma.knowledgeNode.findMany({
-      where: { userId },
+      where: { userId, type: { notIn: ['study_artifact'] } },
+      orderBy: { createdAt: 'desc' },
       take: 100,
       select: { id: true, label: true, type: true, connections: true, createdAt: true },
     }),
@@ -69,7 +70,7 @@ export async function GET(req: NextRequest) {
       where: { userId, createdAt: { gte: sevenDaysAgo } },
     }),
     prisma.knowledgeNode.count({
-      where: { userId, createdAt: { gte: sevenDaysAgo } },
+      where: { userId, type: { notIn: ['study_artifact'] }, createdAt: { gte: sevenDaysAgo } },
     }),
     prisma.conversation.count({
       where: { userId, createdAt: { gte: sevenDaysAgo } },
@@ -83,9 +84,15 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
+  // Defensive check: filter out any nodes with raw CUIDs or internal hashes
+  const isRawId = (str: string) => /^c[a-z0-9]{20,}$/i.test(str) || /^[0-9a-f-]{32,}$/i.test(str);
+  const validNodes = (allNodes || []).filter(
+    (n) => n.label && typeof n.label === 'string' && !isRawId(n.label.trim()) && n.type !== 'study_artifact'
+  );
+
   // Compute total actual relationships from node connections
   let totalRelationships = 0;
-  allNodes.forEach((node) => {
+  validNodes.forEach((node) => {
     if (node.connections) {
       try {
         const conns = JSON.parse(node.connections);
@@ -144,7 +151,7 @@ export async function GET(req: NextRequest) {
     });
   });
 
-  allNodes.slice(0, 4).forEach((node) => {
+  validNodes.slice(0, 4).forEach((node) => {
     activities.push({
       id: `node-${node.id}`,
       type: 'knowledge',

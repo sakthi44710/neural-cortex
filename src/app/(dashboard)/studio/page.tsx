@@ -167,11 +167,22 @@ export default function StudioPage() {
       const res = await fetch('/api/brain/graph');
       const data = await res.json();
 
-      const allNodes = (data.nodes || []).map((n: GraphNode) => ({
-        ...n,
-        val: Math.max((n.strength || 1) * 2.2, 3),
-        color: typeColors[n.type?.toLowerCase()] || '#3b82f6',
-      }));
+      // Filter out internal study artifacts and any nodes with raw CUID/hash labels
+      const isCuidOrHash = (str: string) => /^c[a-z0-9]{20,}$/i.test(str) || /^[0-9a-f-]{32,}$/i.test(str);
+
+      const allNodes = (data.nodes || [])
+        .filter((n: GraphNode) => {
+          if (!n.label || typeof n.label !== 'string') return false;
+          const trimmed = n.label.trim();
+          if (!trimmed || isCuidOrHash(trimmed)) return false;
+          if (n.type === 'study_artifact' || n.type?.startsWith('study_')) return false;
+          return true;
+        })
+        .map((n: GraphNode) => ({
+          ...n,
+          val: Math.max((n.strength || 1) * 2.2, 3),
+          color: typeColors[n.type?.toLowerCase()] || '#3b82f6',
+        }));
 
       const MAX_TOTAL_NODES = 120;
       const importantNodes = allNodes.filter((n: GraphNode) => n.type !== 'entity');

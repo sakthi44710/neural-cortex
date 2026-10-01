@@ -79,6 +79,7 @@ export async function GET(req: NextRequest) {
       prisma.knowledgeNode.findMany({
         where: {
           userId,
+          type: { notIn: ['study_artifact'] },
           OR: [
             { label: { contains: q } },
             { description: { contains: q } },
@@ -91,14 +92,19 @@ export async function GET(req: NextRequest) {
           type: true,
           description: true,
         },
-        take: 6,
+        take: 12,
       }),
     ]);
+
+    const isRawId = (str: string) => /^c[a-z0-9]{20,}$/i.test(str) || /^[0-9a-f-]{32,}$/i.test(str);
+    const filteredKnowledgeNodes = (knowledgeNodes || [])
+      .filter((n: any) => n.type !== 'study_artifact' && !isRawId(n.label?.trim() || ''))
+      .slice(0, 6);
 
     return NextResponse.json({
       documents,
       conversations,
-      knowledgeNodes,
+      knowledgeNodes: filteredKnowledgeNodes,
     });
   } catch (error: any) {
     console.error('Search API Error:', error);

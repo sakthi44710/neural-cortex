@@ -12,22 +12,38 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Fetch only genuine semantic nodes, strictly isolating internal caches like study_artifact
   const nodes = await prisma.knowledgeNode.findMany({
-    where: { userId: session.user.id },
+    where: {
+      userId: session.user.id,
+      type: { notIn: ['study_artifact'] },
+    },
   });
 
-  const graphNodes = nodes.map((n: { id: string; label: string; type: string; strength: number }) => ({
+  // Defensive validation: ensure labels are actual human-readable concepts, not raw CUIDs or hashes
+  const isRawId = (str: string) => /^c[a-z0-9]{20,}$/i.test(str) || /^[0-9a-f-]{32,}$/i.test(str);
+  const validNodes = nodes.filter((n: any) => {
+    if (!n.label || typeof n.label !== 'string') return false;
+    const trimmed = n.label.trim();
+    if (!trimmed || isRawId(trimmed)) return false;
+    if (n.type === 'study_artifact' || n.type.startsWith('study_')) return false;
+    return true;
+  });
+
+  const validNodeIds = new Set(validNodes.map((n: any) => n.id));
+
+  const graphNodes = validNodes.map((n: { id: string; label: string; type: string; strength: number }) => ({
     id: n.id,
     label: n.label,
     type: n.type,
     strength: n.strength,
   }));
 
-  // Build links from connections
+  // Build links only between valid semantic nodes
   const links: { source: string; target: string; strength: number }[] = [];
   const addedLinks = new Set<string>();
 
-  for (const node of nodes) {
+  for (const node of validNodes) {
     let connections: string[] = [];
     try {
       connections = JSON.parse(node.connections || '[]');
@@ -36,9 +52,8 @@ export async function GET(req: NextRequest) {
     }
 
     for (const targetId of connections) {
-      // Verify target exists
-      const targetExists = nodes.some((n: { id: string }) => n.id === targetId);
-      if (!targetExists) continue;
+      // Verify target exists and is an active, valid semantic node
+      if (!validNodeIds.has(node.id) || !validNodeIds.has(targetId)) continue;
 
       const linkKey = [node.id, targetId].sort().join('|');
       if (!addedLinks.has(linkKey)) {

@@ -194,14 +194,18 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        relevantNodes = await prisma.knowledgeNode.findMany({
+        const rawNodes = await prisma.knowledgeNode.findMany({
           where: {
             userId,
+            type: { notIn: ['study_artifact'] },
             OR: searchTerms.map((term) => ({ label: { contains: term } })),
           },
-          take: 8,
+          take: 12,
           select: { label: true, description: true, type: true },
         });
+
+        const isRawId = (str: string) => /^c[a-z0-9]{20,}$/i.test(str) || /^[0-9a-f-]{32,}$/i.test(str);
+        relevantNodes = rawNodes.filter((n) => n.label && !isRawId(n.label.trim()) && n.type !== 'study_artifact').slice(0, 8);
       } catch (nodeErr) {
         console.warn('Failed querying vault nodes for research:', nodeErr);
       }
