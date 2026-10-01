@@ -173,48 +173,92 @@ export async function POST(req: NextRequest) {
 
   const agentContext = await runAgents(message, docsForRAG);
 
-  // Ingest relevant diagram nodes from the user's Knowledge Graph
-  const isDiagramQuery = /\b(diagram|architecture|flowchart|flow|mermaid|visual|schema|model|process|graph|pipeline)\b/i.test(message);
+  // Ingest ONLY the single best matching major diagram node from the user's Knowledge Graph
+  const isDiagramQuery = /\b(diagram|diagrams|architecture|flowchart|flow|mermaid|visual|schema|model|process|graph|pipeline)\b/i.test(message);
   if (isDiagramQuery) {
     try {
-      const diagramNodes = await prisma.knowledgeNode.findMany({
+      const candidateNodes = await prisma.knowledgeNode.findMany({
         where: {
           userId: session.user.id,
           type: 'diagram',
         },
-        take: 4,
+        take: 12,
         orderBy: { updatedAt: 'desc' },
         select: { id: true, label: true, description: true, metadata: true },
       });
 
-      if (diagramNodes.length > 0) {
-        const diagramSnippets = diagramNodes
-          .map((node: any) => {
-            let mermaidCode = '';
-            try {
-              if (node.metadata) {
-                const meta = JSON.parse(node.metadata);
-                if (meta.mermaidCode) {
-                  mermaidCode = `\n\`\`\`mermaid\n${meta.mermaidCode}\n\`\`\``;
-                }
-              }
-            } catch {}
-            return `### Saved Vault Diagram: ${node.label}\n${node.description || ''}${mermaidCode}`;
-          })
-          .join('\n\n');
+      if (candidateNodes.length > 0) {
+        // Extract topic keywords excluding common conversational and meta words
+        const stopWords = new Set([
+          'explain', 'about', 'with', 'diagram', 'diagrams', 'show', 'please', 'the', 'and', 'what',
+          'is', 'how', 'does', 'work', 'give', 'some', 'only', 'major', 'details', 'tell', 'more'
+        ]);
+        const queryWords = message.toLowerCase().split(/[^a-z0-9]+/).filter((w: string) => w.length > 2 && !stopWords.has(w));
 
-        if (diagramSnippets) {
-          agentContext.knowledgeContext = (agentContext.knowledgeContext || '') + '\n\n## Reference Diagrams From Knowledge Vault (Use as background knowledge to provide deep conceptual explanations, component descriptions, and architectural context; NEVER output a bare diagram without substantial explanatory prose):\n\n' + diagramSnippets;
-          diagramNodes.forEach((node: any) => {
+        // Score candidates: prioritize topic relevance and major architectural overviews
+        const scoredCandidates = candidateNodes.map((node: any) => {
+          const labelLower = (node.label || '').toLowerCase();
+          const descLower = (node.description || '').toLowerCase();
+          let score = 0;
+
+          // Keyword matches
+          for (const word of queryWords) {
+            if (labelLower.includes(word)) score += 4;
+            if (descLower.includes(word)) score += 2;
+          }
+
+          // Bonus for high-level / overarching architecture terms
+          if (/\b(architecture|overview|system|structure|lifecycle|pipeline|high-level)\b/i.test(labelLower)) {
+            score += 5;
+          }
+
+          // Penalty for fragmented or minor sub-aspects (disadvantages, sub-storage, etc.)
+          if (/\b(disadvantage|disadvantages|limitation|flaw|storage detail|sub|fragment)\b/i.test(labelLower)) {
+            score -= 6;
+          }
+
+          return { node, score };
+        });
+
+        // Filter for candidates that have relevance (score > 0) or fall back to highest if query is generic
+        scoredCandidates.sort((a, b) => b.score - a.score);
+        const bestCandidate = scoredCandidates[0]?.score > 0 ? scoredCandidates[0].node : (queryWords.length === 0 ? scoredCandidates[0]?.node : null);
+
+        if (bestCandidate) {
+          let mermaidCode = '';
+          try {
+            if (bestCandidate.metadata) {
+              const meta = JSON.parse(bestCandidate.metadata);
+              if (meta.mermaidCode) {
+                mermaidCode = `\n\`\`\`mermaid\n${meta.mermaidCode}\n\`\`\``;
+              }
+            }
+          } catch {}
+
+          if (mermaidCode) {
+            agentContext.knowledgeContext = (agentContext.knowledgeContext || '') +
+              `\n\n## Reference Major Architectural Diagram From Knowledge Vault:
+The user has requested an explanation of the topic with diagrams.
+CRITICAL INSTRUCTION:
+- You must explain the WHOLE CONCEPT comprehensively in deep written prose (Executive Overview, Architecture, Component Breakdown, Operational Workflows, Guarantees, Trade-offs).
+- Include AT MOST ONE (1) major overarching diagram (e.g. System Architecture) using clean Mermaid syntax (\`\`\`mermaid).
+- DO NOT dump multiple diagrams for separate sub-topics (do NOT create separate diagrams for components, storage, disadvantages, etc.).
+- Explain components, storage, and disadvantages in detailed written paragraphs and markdown comparison tables instead of separate diagrams.
+- Walk through the major diagram in depth immediately following it.
+
+Reference Vault Diagram [${bestCandidate.label}]:
+${bestCandidate.description || ''}
+${mermaidCode}`;
+
             agentContext.sources.push({
               type: 'diagram',
-              title: `Diagram: ${node.label}`,
+              title: `Major Architecture Diagram: ${bestCandidate.label}`,
             });
-          });
+          }
         }
       }
     } catch (e) {
-      console.error('Failed to load diagram nodes for RAG:', e);
+      console.error('Failed to load diagram node for RAG:', e);
     }
   }
 

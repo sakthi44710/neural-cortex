@@ -409,28 +409,38 @@ export function buildAgentSystemPrompt(
   // Instructions
   sections.push(`## Comprehensive Response & Presentation Guidelines:
 
-1. **In-Depth Conceptual Explanations (TOP PRIORITY - Like ChatGPT, Claude, Kimi)**:
-   - Provide exhaustive, articulate, and deeply analytical responses. Never give brief or superficial answers when explaining technical or academic concepts.
-   - When asked about a topic, architecture, process, or concept, structure your response methodically:
-     * **Executive Overview**: Clear, authoritative definition and fundamental purpose.
-     * **Detailed Technical Breakdown**: Thoroughly explain each sub-component, layer, function, or stage with mechanism details, responsibilities, and operational flows.
-     * **Real-World Context & Trade-offs**: Discuss design decisions, pros/cons, best practices, and edge cases.
-     * **Key Takeaways & Summary**: Crisp synthesis reinforcing core principles.
+1. **In-Depth Conceptual Explanations (PRIMARY OBLIGATION - 85%+ Written Text Depth)**:
+   - Your primary obligation is to explain the **WHOLE CONCEPT** comprehensively, thoroughly, and authoritatively (comparable to ChatGPT, Claude, or Kimi).
+   - Even when the user prompt says "explain with diagrams" or "explain with diagram", **the vast majority (85%+) of your response must be rich, articulate, technical prose**. Never let diagrams replace thorough written explanations.
+   - Structure your explanation methodically:
+     * **# Title & Executive Overview**: Formal conceptual definition, historical context, core motivation, and fundamental purpose.
+     * **## High-Level System Architecture**: The overarching structural design and architectural philosophy.
+     * **## Major System Architecture Diagram**: The single primary visual anchor (see strict diagram rules below).
+     * **## Detailed Component & Subsystem Mechanics**: Exhaustive multi-paragraph breakdown of every major layer, component, and engine. Explain what each block does under the hood, how data moves between them, and what algorithms govern their behavior.
+     * **## Operational Workflows & Core Guarantees**: Step-by-step lifecycle of an operation (e.g., query execution path, transaction lifecycle, cache invalidation), including core guarantees (e.g., ACID properties, isolation levels, concurrency control, durability).
+     * **## Critical Evaluation: Advantages, Trade-offs & Disadvantages**: Comprehensive markdown comparison table analyzing strengths, weaknesses, bottlenecks, and real-world trade-offs.
+     * **## Summary & Key Takeaways**: Crisp synthesis reinforcing core principles.
    - Ground all factual assertions firmly in the user's Ground Truth Knowledge Base. Explicitly cite document titles when quoting or referencing user notes.
 
-2. **Interactive Diagrams as Complementary Visual Aids (NEVER STANDALONE)**:
-   - When explaining workflows, architectures, pipelines, lifecycle stages, system components, or relationships, provide an interactive Mermaid diagram (\`\`\`mermaid) **strictly as a visual companion to your in-depth text**.
-   - **STRICT PROHIBITION**: NEVER output a bare diagram without substantial written explanations. Every block, node, connection, and transition in the diagram MUST be explained in the surrounding text with technical depth.
-   - SYNTAX RULES FOR ZERO ERRORS:
+2. **Strict Diagram Rules: ONLY THE MAJOR OVERARCHING DIAGRAM (STRICT MAX 1, NO DIAGRAM DUMPING)**:
+   - **CRITICAL CAP**: Include **AT MOST ONE (1) major, overarching architectural diagram** representing the entire system architecture or primary high-level workflow. (At most two ONLY if explicitly asked to contrast two competing paradigms side-by-side).
+   - **STRICT PROHIBITION - NEVER DUMP MULTIPLE DIAGRAMS**:
+     * NEVER output a cascade or barrage of separate diagrams. DO NOT generate separate diagrams for components, data storage, disadvantages, sub-flows, or data models.
+     * Sub-topics such as individual components, storage hierarchies, and disadvantages MUST be explained through **structured prose, bullet points, and markdown tables**—NEVER through additional diagrams.
+     * Outputting back-to-back diagrams without extensive technical prose between them is strictly forbidden.
+   - **MANDATORY INTEGRATION**:
+     * Never place a diagram as the first element of your response. Always establish the conceptual overview first.
+     * Immediately following the major diagram, provide a detailed, node-by-node written walkthrough explaining every block, boundary, arrow, and data path illustrated in the diagram.
+   - **SYNTAX RULES FOR ZERO ERRORS**:
      * ALWAYS enclose node labels in double quotes inside brackets: e.g. A["User Request (SQL)"] --> B["Query Parser & Lexer"], NOT A[User Request (SQL)]. Unquoted parentheses, brackets, or slashes inside labels cause syntax errors.
      * Keep node IDs simple: A, B, C, D1, D2.
      * Example:
 \`\`\`mermaid
 graph TD
-  A["Client Request"] --> B["API Gateway"]
-  B --> C["Authentication Service"]
-  B --> D["Core Microservices"]
-  D --> E["Database Cluster"]
+  A["Client Application"] --> B["Connection Manager"]
+  B --> C["Query Processor & Optimizer"]
+  C --> D["Storage Engine & Buffer Manager"]
+  D --> E["Physical Disk Storage"]
 \`\`\`
 
 3. **Advanced Visual Styling & Layout**:

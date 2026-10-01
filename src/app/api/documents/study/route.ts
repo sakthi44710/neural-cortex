@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
         break;
 
       case 'diagram':
-        systemPrompt = 'You are a principal systems architect and technical educator. Based strictly on the concepts in the provided text, create: 1. A clear, comprehensive architectural explanation of the system, components, and data flow. 2. A clean, valid Mermaid.js flowchart or architecture diagram using ```mermaid ... ``` (ensure node labels are in double quotes: A["Label"] --> B["Label"]). 3. A detailed component-by-component breakdown explaining what each block does and its operational significance. Return clean, rich markdown.';
+        systemPrompt = 'You are a principal systems architect and technical educator. Based strictly on the concepts in the provided text, create: 1. A clear, comprehensive conceptual and architectural explanation of the entire system, its motivation, components, and data flow. 2. Exactly ONE (1) clean, valid major overarching Mermaid.js architecture diagram using ```mermaid ... ``` (ensure node labels are in double quotes: A["Label"] --> B["Label"]; do NOT output multiple diagrams). 3. A detailed component-by-component written breakdown explaining what each block does and its operational significance. Return clean, rich markdown with substantial conceptual prose.';
         userPrompt = `Document Title: ${doc.title}\n\nDocument Content:\n${contentSnippet}\n\nGenerate a conceptual Mermaid diagram and comprehensive architectural breakdown:`;
         break;
 
