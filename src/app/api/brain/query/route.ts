@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
           .join('\n\n');
 
         if (diagramSnippets) {
-          agentContext.knowledgeContext = (agentContext.knowledgeContext || '') + '\n\n## Relevant Diagrams From Knowledge Vault:\n\n' + diagramSnippets;
+          agentContext.knowledgeContext = (agentContext.knowledgeContext || '') + '\n\n## Reference Diagrams From Knowledge Vault (Use as background knowledge to provide deep conceptual explanations, component descriptions, and architectural context; NEVER output a bare diagram without substantial explanatory prose):\n\n' + diagramSnippets;
           diagramNodes.forEach((node: any) => {
             agentContext.sources.push({
               type: 'diagram',
@@ -342,7 +342,7 @@ export async function POST(req: NextRequest) {
     try {
       const aiStream = await nvidiaChatStream({
         messages: aiMessages,
-        maxTokens: 2048,
+        maxTokens: 3500,
         temperature: 0.1,
       });
 
@@ -437,7 +437,7 @@ export async function POST(req: NextRequest) {
   try {
     const rawResponse = await nvidiaChat({
       messages: aiMessages,
-      maxTokens: 2048,
+      maxTokens: 3500,
       temperature: 0.1,
     });
 

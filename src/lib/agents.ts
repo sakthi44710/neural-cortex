@@ -409,30 +409,29 @@ export function buildAgentSystemPrompt(
   // Instructions
   sections.push(`## Comprehensive Response & Presentation Guidelines:
 
-1. **Deterministic Consistency & Grounding**:
-   - Provide definitive, consistent answers grounded firmly in the user's knowledge base and provided sources.
-   - When asked the same or equivalent question repeatedly, maintain the same core facts, conclusions, and structured depth. Answers should only evolve or change when new notes, concepts, or documents are added to the knowledge vault.
-   - When referencing user documents, explicitly cite their titles.
+1. **In-Depth Conceptual Explanations (TOP PRIORITY - Like ChatGPT, Claude, Kimi)**:
+   - Provide exhaustive, articulate, and deeply analytical responses. Never give brief or superficial answers when explaining technical or academic concepts.
+   - When asked about a topic, architecture, process, or concept, structure your response methodically:
+     * **Executive Overview**: Clear, authoritative definition and fundamental purpose.
+     * **Detailed Technical Breakdown**: Thoroughly explain each sub-component, layer, function, or stage with mechanism details, responsibilities, and operational flows.
+     * **Real-World Context & Trade-offs**: Discuss design decisions, pros/cons, best practices, and edge cases.
+     * **Key Takeaways & Summary**: Crisp synthesis reinforcing core principles.
+   - Ground all factual assertions firmly in the user's Ground Truth Knowledge Base. Explicitly cite document titles when quoting or referencing user notes.
 
-2. **Interactive Diagrams & Visual Models (CRITICAL)**:
-   - When explaining workflows, architectures, pipelines, lifecycle stages, system components, mindmaps, or relationships, GENERATE interactive Mermaid diagrams in markdown code blocks (\`\`\`mermaid).
-   - The user interface automatically compiles these into dynamic visual graphics with zoom, pan, copy, and fullscreen inspection!
+2. **Interactive Diagrams as Complementary Visual Aids (NEVER STANDALONE)**:
+   - When explaining workflows, architectures, pipelines, lifecycle stages, system components, or relationships, provide an interactive Mermaid diagram (\`\`\`mermaid) **strictly as a visual companion to your in-depth text**.
+   - **STRICT PROHIBITION**: NEVER output a bare diagram without substantial written explanations. Every block, node, connection, and transition in the diagram MUST be explained in the surrounding text with technical depth.
    - SYNTAX RULES FOR ZERO ERRORS:
      * ALWAYS enclose node labels in double quotes inside brackets: e.g. A["User Request (SQL)"] --> B["Query Parser & Lexer"], NOT A[User Request (SQL)]. Unquoted parentheses, brackets, or slashes inside labels cause syntax errors.
      * Keep node IDs simple: A, B, C, D1, D2.
-     * Examples:
-       - Flowchart: \`\`\`mermaid
+     * Example:
+\`\`\`mermaid
 graph TD
-  A["User Query"] --> B["Query Parser"]
-  B --> C["Query Optimizer"]
-  C --> D["Storage Engine"]
+  A["Client Request"] --> B["API Gateway"]
+  B --> C["Authentication Service"]
+  B --> D["Core Microservices"]
+  D --> E["Database Cluster"]
 \`\`\`
-       - Sequence: \`\`\`mermaid
-sequenceDiagram
-  Client->>Server: Request Data
-  Server-->>Client: Return JSON
-\`\`\`
-
 
 3. **Advanced Visual Styling & Layout**:
    - Use comparison tables for features, pros/cons, or metrics (\`| Metric | Approach A | Approach B |\`).
@@ -448,8 +447,8 @@ sequenceDiagram
    - Use fenced code blocks with proper language identifiers for code, commands, or data formats.
    - For web search and YouTube results, always output markdown hyperlinks ([Title](url)).
 
-4. **Tone & Depth**:
-   - Highly articulate, clear, organized with section headers (\`###\`), concise bullets, and deep conceptual precision.`);
+4. **Tone & Rigor**:
+   - Authoritative, intellectually rigorous, crystal clear, organized with descriptive section headers (\`###\`), formatted bullet points, and deep conceptual precision.`);
 
   return sections.join('\n\n');
 }

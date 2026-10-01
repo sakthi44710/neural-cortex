@@ -529,11 +529,11 @@ function ConverseContent() {
   );
 
   const quickDiagramChips = [
-    { label: 'System Architecture', prompt: 'Generate a clean architecture diagram for this domain and explain each core layer.' },
-    { label: 'Flowchart Logic', prompt: 'Create a detailed flowchart diagram showing the process workflow, validations, and outcomes.' },
-    { label: 'ER Data Model', prompt: 'Generate an Entity-Relationship (ER) diagram illustrating the data models and relationships.' },
-    { label: 'Concept Mindmap', prompt: 'Create a conceptual mindmap connecting the main themes and subtopics in this area.' },
-    { label: 'Compare & Contrast', prompt: 'Synthesize a comparative matrix evaluating the advantages, trade-offs, and failure modes.' },
+    { label: 'System Architecture', prompt: 'Provide a comprehensive architectural breakdown and conceptual explanation of this system, accompanied by a clean Mermaid architecture diagram illustrating each layer and data flow.' },
+    { label: 'Flowchart Logic', prompt: 'Explain the complete end-to-end process workflow, validations, and edge cases in depth, accompanied by a detailed Mermaid flowchart.' },
+    { label: 'ER Data Model', prompt: 'Explain the core entities, relationships, and data modeling trade-offs in depth, accompanied by an Entity-Relationship (ER) Mermaid diagram.' },
+    { label: 'Concept Mindmap', prompt: 'Provide an in-depth conceptual breakdown of the core themes, principles, and interconnections, accompanied by a structured Mermaid mindmap.' },
+    { label: 'Compare & Contrast', prompt: 'Synthesize a thorough analytical comparison evaluating core principles, advantages, trade-offs, and failure modes in depth.' },
   ];
 
   return (

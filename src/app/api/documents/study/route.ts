@@ -4,6 +4,63 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { nvidiaChat, isNvidiaConfigured } from '@/lib/nvidia';
 
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const docId = searchParams.get('docId');
+    if (!docId) {
+      return NextResponse.json({ error: 'docId is required' }, { status: 400 });
+    }
+
+    const doc = await prisma.document.findUnique({
+      where: { id: docId },
+      select: { id: true, userId: true },
+    });
+
+    if (!doc || doc.userId !== session.user.id) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+    }
+
+    // Fetch all saved study artifacts for this document
+    const artifacts = await prisma.knowledgeNode.findMany({
+      where: {
+        userId: session.user.id,
+        type: 'study_artifact',
+        label: docId,
+      },
+    });
+
+    const studyData: Record<string, { raw: string; data?: any; updatedAt?: string }> = {};
+    for (const art of artifacts) {
+      if (art.description && art.metadata) {
+        try {
+          const parsed = JSON.parse(art.metadata);
+          studyData[art.description] = {
+            raw: parsed.raw,
+            data: parsed.data,
+            updatedAt: art.updatedAt.toISOString(),
+          };
+        } catch {
+          studyData[art.description] = { raw: art.metadata, updatedAt: art.updatedAt.toISOString() };
+        }
+      }
+    }
+
+    return NextResponse.json({ studyData });
+  } catch (error: any) {
+    console.error('Failed to load cached study artifacts:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to load study artifacts' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -11,7 +68,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { docId, mode } = await req.json();
+    const { docId, mode, redefine } = await req.json();
     if (!docId || !mode) {
       return NextResponse.json({ error: 'docId and mode are required' }, { status: 400 });
     }
@@ -22,6 +79,32 @@ export async function POST(req: NextRequest) {
 
     if (!doc || doc.userId !== session.user.id) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+    }
+
+    // Check if previously generated and cached in KnowledgeNode
+    const existingNode = await prisma.knowledgeNode.findFirst({
+      where: {
+        userId: session.user.id,
+        type: 'study_artifact',
+        label: docId,
+        description: mode,
+      },
+    });
+
+    // If not redefining and cached artifact exists, return immediately (saves API credits!)
+    if (existingNode && !redefine && existingNode.metadata) {
+      try {
+        const parsed = JSON.parse(existingNode.metadata);
+        return NextResponse.json({
+          mode,
+          data: parsed.data,
+          raw: parsed.raw,
+          cached: true,
+          updatedAt: existingNode.updatedAt.toISOString(),
+        });
+      } catch {
+        // If metadata was corrupted, continue to regenerate
+      }
     }
 
     const contentSnippet = doc.content.slice(0, 12000); // Up to ~3000 tokens for optimal processing
@@ -62,8 +145,8 @@ export async function POST(req: NextRequest) {
         break;
 
       case 'diagram':
-        systemPrompt = 'You are a technical systems architect. Based strictly on the concepts in the provided text, create a clear, elegant Mermaid.js flowchart or architecture diagram that illustrates the core flow, hierarchy, or taxonomy. Return clean markdown with an explanation followed by the ```mermaid ... ``` code block. Do NOT use fancy icons or non-standard syntax.';
-        userPrompt = `Document Title: ${doc.title}\n\nDocument Content:\n${contentSnippet}\n\nGenerate a conceptual Mermaid diagram:`;
+        systemPrompt = 'You are a principal systems architect and technical educator. Based strictly on the concepts in the provided text, create: 1. A clear, comprehensive architectural explanation of the system, components, and data flow. 2. A clean, valid Mermaid.js flowchart or architecture diagram using ```mermaid ... ``` (ensure node labels are in double quotes: A["Label"] --> B["Label"]). 3. A detailed component-by-component breakdown explaining what each block does and its operational significance. Return clean, rich markdown.';
+        userPrompt = `Document Title: ${doc.title}\n\nDocument Content:\n${contentSnippet}\n\nGenerate a conceptual Mermaid diagram and comprehensive architectural breakdown:`;
         break;
 
       case 'study-guide':
@@ -78,22 +161,59 @@ export async function POST(req: NextRequest) {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      maxTokens: 2500,
+      maxTokens: 3000,
       temperature: 0.2,
     });
 
+    let parsedData = null;
     if (mode === 'mcq' || mode === 'flashcards') {
       try {
         const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || aiResponse.match(/\[\s*\{[\s\S]*\}\s*\]/);
         const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : aiResponse;
-        const parsed = JSON.parse(jsonStr.trim());
-        return NextResponse.json({ mode, data: parsed, raw: aiResponse });
+        parsedData = JSON.parse(jsonStr.trim());
       } catch (parseErr) {
-        return NextResponse.json({ mode, data: null, raw: aiResponse });
+        console.warn('Failed to parse structured JSON for study mode:', parseErr);
       }
     }
 
-    return NextResponse.json({ mode, raw: aiResponse });
+    // Persist to KnowledgeNode so future visits load instantly without calling the AI API
+    const artifactPayload = JSON.stringify({
+      mode,
+      raw: aiResponse,
+      data: parsedData,
+    });
+
+    try {
+      if (existingNode) {
+        await prisma.knowledgeNode.update({
+          where: { id: existingNode.id },
+          data: {
+            metadata: artifactPayload,
+            updatedAt: new Date(),
+          },
+        });
+      } else {
+        await prisma.knowledgeNode.create({
+          data: {
+            userId: session.user.id,
+            type: 'study_artifact',
+            label: docId,
+            description: mode,
+            metadata: artifactPayload,
+          },
+        });
+      }
+    } catch (saveErr) {
+      console.error('Failed to save study artifact cache:', saveErr);
+    }
+
+    return NextResponse.json({
+      mode,
+      data: parsedData,
+      raw: aiResponse,
+      cached: false,
+      updatedAt: new Date().toISOString(),
+    });
   } catch (error: any) {
     console.error('Study Mode generation error:', error);
     return NextResponse.json(

@@ -97,7 +97,9 @@ export default function VaultPage() {
   // Study Mode State
   const [studyTab, setStudyTab] = useState<StudyTab>('study-guide');
   const [studyLoading, setStudyLoading] = useState(false);
-  const [studyData, setStudyData] = useState<{ [key in StudyTab]?: { raw?: string; data?: any } }>({});
+  const [studyData, setStudyData] = useState<{
+    [key in StudyTab]?: { raw?: string; data?: any; cached?: boolean; updatedAt?: string };
+  }>({});
   const [mcqUserAnswers, setMcqUserAnswers] = useState<{ [qIndex: number]: string }>({});
   const [flashcardIndex, setFlashcardIndex] = useState(0);
   const [flashcardFlipped, setFlashcardFlipped] = useState(false);
@@ -307,6 +309,20 @@ export default function VaultPage() {
     fetchDocuments();
   };
 
+  const fetchSavedStudyData = async (docId: string) => {
+    try {
+      const res = await fetch(`/api/documents/study?docId=${docId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.studyData) {
+          setStudyData(data.studyData);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load saved study artifacts:', err);
+    }
+  };
+
   const openDocumentWorkspace = async (doc: Doc) => {
     setActiveDoc(doc);
     setWorkspaceTab('overview');
@@ -314,6 +330,9 @@ export default function VaultPage() {
     setMcqUserAnswers({});
     setFlashcardIndex(0);
     setFlashcardFlipped(false);
+
+    // Pre-load all saved study artifacts from database (saves API credits!)
+    fetchSavedStudyData(doc.id);
 
     // Fetch full content if it was loaded in light mode
     if (!doc.content || doc.content.length === 0) {
@@ -329,25 +348,30 @@ export default function VaultPage() {
     }
   };
 
-  // Study Mode Generator
-  const generateStudyContent = async (mode: StudyTab) => {
+  // Study Mode Generator with database caching and on-demand redefine
+  const generateStudyContent = async (mode: StudyTab, isRedefine: boolean = false) => {
     if (!activeDoc) return;
     setStudyTab(mode);
-    if (studyData[mode]) return; // already loaded
+    if (studyData[mode] && !isRedefine) return; // already loaded/cached, avoid re-running API call
 
     setStudyLoading(true);
     try {
       const res = await fetch('/api/documents/study', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ docId: activeDoc.id, mode }),
+        body: JSON.stringify({ docId: activeDoc.id, mode, redefine: isRedefine }),
       });
       const data = await res.json();
       if (res.ok) {
         setStudyData((prev) => ({
           ...prev,
-          [mode]: { raw: data.raw, data: data.data },
+          [mode]: { raw: data.raw, data: data.data, cached: data.cached, updatedAt: data.updatedAt },
         }));
+        if (isRedefine) {
+          toast.success(`Redefined ${mode} content with fresh AI analysis`);
+        } else if (data.cached) {
+          toast(`Loaded saved ${mode} from Vault`, { icon: '📂' });
+        }
       } else {
         toast.error(data.error || 'Failed to generate study artifact');
       }
@@ -1218,6 +1242,34 @@ export default function VaultPage() {
                       })}
                     </div>
 
+                    {/* Saved Status & Redefine Action Bar */}
+                    {studyData[studyTab] && !studyLoading && (
+                      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)]">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-semibold text-[var(--text-primary)] capitalize">
+                            {studyTab.replace('-', ' ')}
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-medium">
+                            <CheckCircle2 className="w-3 h-3" /> Saved to Vault
+                          </span>
+                          {studyData[studyTab]?.updatedAt && (
+                            <span className="text-[11px] text-[var(--text-secondary)]">
+                              (Saved {new Date(studyData[studyTab]!.updatedAt!).toLocaleDateString()})
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => generateStudyContent(studyTab, true)}
+                          disabled={studyLoading}
+                          className="px-3.5 py-1.5 rounded-xl bg-[var(--surface)] hover:bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/30 hover:border-[var(--accent)] text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
+                          title="Re-run AI generation with fresh reasoning and update saved vault material"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${studyLoading ? 'animate-spin' : ''}`} />
+                          <span>Redefine Content</span>
+                        </button>
+                      </div>
+                    )}
+
                     {/* Study Mode Content Output */}
                     <div className="p-5 rounded-2xl bg-[var(--surface-elevated)] border border-[var(--border)] min-h-[300px]">
                       {studyLoading ? (
@@ -1251,13 +1303,12 @@ export default function VaultPage() {
                               5 Grounded Multiple Choice Questions
                             </h3>
                             <button
-                              onClick={() => {
-                                setStudyData((prev) => ({ ...prev, mcq: undefined }));
-                                generateStudyContent('mcq');
-                              }}
-                              className="text-xs text-[var(--accent)] hover:underline flex items-center gap-1"
+                              onClick={() => generateStudyContent('mcq', true)}
+                              disabled={studyLoading}
+                              className="text-xs text-[var(--accent)] hover:underline flex items-center gap-1.5 disabled:opacity-50 font-medium"
+                              title="Redefine MCQs with fresh questions"
                             >
-                              <RefreshCw className="w-3 h-3" /> Re-generate
+                              <RefreshCw className={`w-3 h-3 ${studyLoading ? 'animate-spin' : ''}`} /> Redefine MCQs
                             </button>
                           </div>
 
