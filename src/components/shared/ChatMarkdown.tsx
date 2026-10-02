@@ -31,28 +31,47 @@ interface ChatMarkdownProps {
 import DOMPurify from 'dompurify';
 
 // Ensure DOMPurify has required hooks and sanitize methods in Next.js browser context
-if (typeof window !== 'undefined') {
+export function ensureDOMPurifyPatched() {
   try {
     if (typeof DOMPurify === 'function') {
-      const instance = (DOMPurify as any)(window);
+      const instance = (DOMPurify as any)(typeof window !== 'undefined' ? window : undefined);
       if (instance) {
         Object.assign(DOMPurify, instance);
       }
     }
   } catch (e) {
-    console.warn('DOMPurify window binding note:', e);
+    // Non-fatal fallback
   }
 
-  if (typeof (DOMPurify as any).addHook !== 'function') {
-    (DOMPurify as any).addHook = () => {};
-    (DOMPurify as any).removeHook = () => {};
-    (DOMPurify as any).removeHooks = () => {};
-    (DOMPurify as any).removeAllHooks = () => {};
+  const targets = [
+    DOMPurify,
+    (DOMPurify as any)?.default,
+    (DOMPurify as any)?.prototype,
+    typeof window !== 'undefined' ? (window as any)?.DOMPurify : null,
+    typeof globalThis !== 'undefined' ? (globalThis as any)?.DOMPurify : null,
+  ].filter(Boolean);
+
+  targets.forEach((target: any) => {
+    if (typeof target.addHook !== 'function') target.addHook = () => {};
+    if (typeof target.removeHook !== 'function') target.removeHook = () => {};
+    if (typeof target.removeHooks !== 'function') target.removeHooks = () => {};
+    if (typeof target.removeAllHooks !== 'function') target.removeAllHooks = () => {};
+    if (typeof target.sanitize !== 'function') target.sanitize = (txt: string) => txt;
+    if (typeof target.isValidAttribute !== 'function') target.isValidAttribute = () => true;
+    if (typeof target.setConfig !== 'function') target.setConfig = () => {};
+    if (typeof target.clearConfig !== 'function') target.clearConfig = () => {};
+  });
+
+  if (typeof window !== 'undefined') {
+    (window as any).DOMPurify = DOMPurify;
   }
-  if (typeof (DOMPurify as any).sanitize !== 'function') {
-    (DOMPurify as any).sanitize = (txt: string) => txt;
+  if (typeof globalThis !== 'undefined') {
+    (globalThis as any).DOMPurify = DOMPurify;
   }
-  (window as any).DOMPurify = DOMPurify;
+}
+
+if (typeof window !== 'undefined') {
+  ensureDOMPurifyPatched();
 
   try {
     mermaid.initialize({
@@ -90,7 +109,7 @@ function cleanupMermaidArtifacts() {
   if (typeof document === 'undefined') return;
   try {
     const stray = document.querySelectorAll(
-      'body > .error-icon, body > .error-text, body > [aria-roledescription="error"]'
+      'body > .error-icon, body > .error-text, body > [aria-roledescription="error"], body > [id^="dmm_"], body > [id^="dmermaid"]'
     );
     stray.forEach((el) => {
       try {
@@ -219,33 +238,13 @@ function MermaidViewer({ chart }: { chart: string }) {
           return;
         }
 
-        if (typeof (DOMPurify as any).addHook !== 'function') {
-          (DOMPurify as any).addHook = () => {};
-          (DOMPurify as any).removeHook = () => {};
-          (DOMPurify as any).removeHooks = () => {};
-          (DOMPurify as any).removeAllHooks = () => {};
-        }
-        if (typeof (DOMPurify as any).sanitize !== 'function') {
-          (DOMPurify as any).sanitize = (txt: string) => txt;
-        }
+        ensureDOMPurifyPatched();
 
-        // Dedicated hidden offscreen container for Mermaid to safely render inside
-        const container = document.createElement('div');
-        container.style.position = 'absolute';
-        container.style.top = '-9999px';
-        container.style.left = '-9999px';
-        container.style.visibility = 'hidden';
-        document.body.appendChild(container);
-
-        try {
-          const id = `mm_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
-          const { svg: renderedSvg } = await mermaid.render(id, sanitized, container);
-          if (isMounted) {
-            setSvg(renderedSvg);
-            setError(null);
-          }
-        } finally {
-          container.remove();
+        const id = `mm_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
+        const { svg: renderedSvg } = await mermaid.render(id, sanitized);
+        if (isMounted) {
+          setSvg(renderedSvg);
+          setError(null);
         }
       } catch (err: any) {
         if (isMounted) {
